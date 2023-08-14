@@ -20,8 +20,14 @@ def create_text_list(dataset_list):
         text_list[i] = dataset_list[i]['text']
     return text_list
 
-dataset_list = load_json("/home/efrath/repos/NLP-final-project/datasets/timelms/data/tweets/tweets-2020-2021-subset-rnd.jl")
-text_list = create_text_list(dataset_list)
+def create_text_data():
+    dataset_list = load_json("tweets-2020-2021-subset-rnd.jl")
+    text_list = create_text_list(dataset_list)
+    sentiment_file = open("text_data.txt", "a")
+    for text in text_list:
+        sentiment_file.write(text + "\n")
+    return text_list
+
 
 # Preprocess text (username and link placeholders)
 def preprocess(text):
@@ -51,12 +57,12 @@ MODEL = f"cardiffnlp/twitter-roberta-base-sentiment-latest"
 #     print(f"{i+1}) {l} {np.round(float(s), 4)}")
 
 # Pipeline example:
+text_list = create_text_data()
 sentiment_task = pipeline("sentiment-analysis", model=MODEL, tokenizer=MODEL)
 result = sentiment_task("Covid cases are increasing fast!",return_all_scores=True)
 
 sentiment_file = open("twitter_roberta_sentiment_results.txt","a")
 for text in text_list:
-    result = sentiment_task(text ,return_all_scores=True)
-    print(result)
-    sentiment_file.write(result)
+    result = sentiment_task(text, return_all_scores=True)
+    sentiment_file.write(str(result) + "\n")
 sentiment_file.close()
