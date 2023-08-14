@@ -15,6 +15,7 @@ from datasets import load_dataset
 
 def get_sentiment_task_results(sentiment_task, text):
     result = sentiment_task(text, return_all_scores=True)
+    # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
     return [result[0][0]['score'], result[0][1]['score'], result[0][2]['score']]
 
 def create_csv_data_sentiment_model():
@@ -22,6 +23,5 @@ def create_csv_data_sentiment_model():
     sentiment_task = pipeline("sentiment-analysis", model=MODEL, tokenizer=MODEL)
     dataset = load_dataset("parquet", data_files='tweet_sentiment_multilingual-train.parquet')
     dataset = dataset["train"]
-
     dataset_modified = dataset.map(lambda dict: {"text": dict["text"], "label": get_sentiment_task_results(sentiment_task, dict["text"])})
-    dataset_modified.to_csv("dataset_new.csv")
+    dataset_modified.to_csv("sentiment_dataset.csv")
