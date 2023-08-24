@@ -21,7 +21,7 @@ def preprocess(text):
     return " ".join(new_text)
 
 MODEL = f"cardiffnlp/twitter-roberta-base-sentiment-latest"
-# tokenizer = AutoTokenizer.from_pretrained(MODEL)
+tokenizer = AutoTokenizer.from_pretrained(MODEL)
 # config = AutoConfig.from_pretrained(MODEL)
 # # PT
 # model = AutoModelForSequenceClassification.from_pretrained(MODEL)
@@ -46,11 +46,11 @@ MODEL = f"cardiffnlp/twitter-roberta-base-sentiment-latest"
 #      ------------------------ Paraphrase Generation: option 1 -------------------------------- #
 
 
-# tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
-# model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws")
-#
-# # Define the pipeline
-# paraphrase_pipeline = pipeline("text-generation", model=model,tokenizer=tokenizer)
+tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+
+# Define the pipeline
+paraphrase_pipeline = pipeline("text-generation", model=model,tokenizer=tokenizer)
 #
 #
 # # Generate paraphrases using the pipeline
