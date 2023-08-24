@@ -23,7 +23,8 @@ def create_csv_data_sentiment_model():
     dataset = load_dataset("parquet", data_files='tweet_sentiment_multilingual-train.parquet')
     dataset = dataset["train"]
     dataset = dataset.select([0, 10])
-    dataset_modified = dataset.map(lambda dict: {"text": dict["text"], "label": get_sentiment_task_results(sentiment_task, dict["text"])})
+    dataset_modified = dataset.map(lambda dict: {"text": "what sentiment the following sentence has: " + dict["text"],
+                                                 "label": get_sentiment_task_results(sentiment_task, dict["text"])})
     dataset_modified.to_csv("sentiment_dataset.csv")
 
 def get_yesno_task_results(yesno_task, text):
@@ -40,9 +41,9 @@ def create_csv_data_yesno_model():
     dataset = dataset["train"]
     dataset = dataset.remove_columns(["passage"])
     dataset = dataset.select([0, 10])
-    dataset_modified = dataset.map(lambda dict: {"question": dict["question"], "answer": get_yesno_task_results(yesno_task, dict["question"])})
+    dataset_modified = dataset.map(lambda dict: {"question": "Answer yes or no: " + dict["question"], "answer": get_yesno_task_results(yesno_task, dict["question"])})
     dataset_modified.to_csv("yesno_dataset.csv")
 
 create_csv_data_sentiment_model()
-# create_csv_data_yesno_model()
+create_csv_data_yesno_model()
 print("here")
