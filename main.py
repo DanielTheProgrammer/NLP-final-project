@@ -75,19 +75,20 @@ model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws", return
 # gpt2 = AutoModelForCausalLM.from_pretrained("gpt2", return_dict_in_generate=True)
 # tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
-input_ids = tokenizer("Today is a nice day", return_tensors="pt").input_ids
+input_ids = tokenizer("I think it's a great idea", return_tensors="pt").input_ids
 
-generated_outputs = model.generate(input_ids, do_sample=True, num_return_sequences=3, output_scores=True)
-
+generated_outputs = model.generate(input_ids, do_sample=True, num_return_sequences=4, output_scores=True)
 transition_scores = model.compute_transition_scores(generated_outputs.sequences, generated_outputs.scores, normalize_logits=True)
 
 # input_length is the length of the input prompt for decoder-only models, like the GPT family, and 1 for
 # encoder-decoder models, like BART or T5.
 input_length = 1 if model.config.is_encoder_decoder else input_ids.input_ids.shape[1]
 generated_tokens = generated_outputs.sequences[:, input_length:]
-for tok, score in zip(generated_tokens[0], transition_scores[0]):
+for tok0, tok1, tok2, tok3, score0, score1, score2, score3 in zip(generated_tokens[0], generated_tokens[1], generated_tokens[2], generated_tokens[3], transition_scores[0], transition_scores[1], transition_scores[2], transition_scores[3]):
     # | token | token string | logits | probability
-    print(f"| {tok:5d} | {tokenizer.decode(tok):8s} | {score.numpy():.3f} | {np.exp(score.numpy()):.2%}")
+    print(f"| {tokenizer.decode(tok0):8s} | {tokenizer.decode(tok1):8s} | {tokenizer.decode(tok2):8s} | {tokenizer.decode(tok3):8s} | {np.exp(score0.numpy()):.2%} | {np.exp(score1.numpy()):.2%} | {np.exp(score2.numpy()):.2%} | {np.exp(score3.numpy()):.2%}")
+
+
 
 
 # only use id's that were generated
