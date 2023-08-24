@@ -5,7 +5,7 @@ import numpy as np
 from scipy.special import softmax
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import json
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 
 #      ------------------------ Sentiment Analysis  -------------------------------- #
 
@@ -52,9 +52,16 @@ def create_csv_data_yesno_model(starting_idx):
     dataset = dataset.rename_column("answer", "label")
     dataset.to_csv("yesno_dataset.csv")
 
-# def merge_datasets(dataset1, dataset2):
-
+def merge_datasets(dataset1_filename, dataset2_filename):
+    dataset1 = load_dataset("csv", data_files=dataset1_filename)
+    dataset2 = load_dataset("csv", data_files=dataset2_filename)
+    dataset1 = dataset1["train"]
+    dataset2 = dataset2["train"]
+    final_dataset = concatenate_datasets([dataset1, dataset2])
+    final_dataset = final_dataset.shuffle()
+    final_dataset.to_csv("final_dataset.csv")
 
 curr_idx = create_csv_data_sentiment_model()
 create_csv_data_yesno_model(curr_idx)
+merge_datasets("sentiment_dataset.csv", "yesno_dataset.csv")
 print("here")
