@@ -23,12 +23,15 @@ def create_csv_data_sentiment_model():
     dataset = load_dataset("parquet", data_files='tweet_sentiment_multilingual-train.parquet')
     dataset = dataset["train"]
     dataset = dataset.select([0, 10])
-    dataset = dataset.map(lambda dict: {"text": "what sentiment the following sentence has: " + dict["text"],
+    dataset_base = dataset.map(lambda dict: {"text": "what sentiment the following sentence has: " + dict["text"],
                                                  "label": get_sentiment_task_results(sentiment_task, dict["text"]),
                                                  "task": "sentiment"})
-    dataset = dataset.add_column("idx", [i for i in range(len(dataset))])
-    dataset.to_csv("sentiment_dataset.csv")
-    return len(dataset)
+    dataset_base = dataset_base.add_column("idx", [i for i in range(len(dataset))])
+    dataset_base.to_csv("sentiment_dataset_base.csv")
+
+    dataset_for_model = dataset_base.remove_columns(["task", "idx"])
+    dataset_for_model.to_csv("sentiment_dataset.csv")
+    return len(dataset_base)
 
 def get_yesno_task_results(yesno_task, text):
     result = yesno_task(text, return_all_scores=True)
@@ -50,7 +53,10 @@ def create_csv_data_yesno_model(starting_idx):
     dataset = dataset.add_column("idx", [i+starting_idx for i in range(len(dataset))])
     dataset = dataset.rename_column("question", "text")
     dataset = dataset.rename_column("answer", "label")
-    dataset.to_csv("yesno_dataset.csv")
+    dataset.to_csv("yesno_dataset_base.csv")
+
+    dataset_for_model = dataset.remove_columns(["task", "idx"])
+    dataset_for_model.to_csv("yesno_dataset.csv")
 
 def merge_datasets(dataset1_filename, dataset2_filename):
     dataset1 = load_dataset("csv", data_files=dataset1_filename)

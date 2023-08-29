@@ -12,8 +12,6 @@ from torch import nn
 from torchmetrics import Accuracy
 from torchvision import transforms
 from torchvision.datasets import MNIST
-from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model
-from datasets import load_dataset, concatenate_datasets
 
 
 def compute_accuracy(logits, labels):
@@ -22,62 +20,13 @@ def compute_accuracy(logits, labels):
     return acc, predicted_label
 
 
-# class ClassificationModel(pl.LightningModule):
-#     def __init__(self, training_arguments, model_arguments, other_arguments):
-#         super(ClassificationModel, self).__init__()
-#
-#         self.training_arguments = training_arguments
-#         self.model_arguments = model_arguments
-#         self.other_arguments = other_arguments
-#
-#         self.dims = (1, 28, 28)
-#         channels, width, height = self.dims
-#         self.transform = transforms.Compose(
-#             [
-#                 transforms.ToTensor(),
-#                 transforms.Normalize((0.1307,), (0.3081,)),
-#             ]
-#         )
-#         self.model = nn.Sequential(
-#             nn.Flatten(),
-#             nn.Linear(channels * width * height, self.model_arguments.fc1_size),
-#             nn.ReLU(),
-#             nn.Dropout(0.1),
-#             nn.Linear(self.model_arguments.fc1_size, self.model_arguments.fc1_size),
-#             nn.ReLU(),
-#             nn.Dropout(0.1),
-#             nn.Linear(self.model_arguments.fc1_size, self.model_arguments.num_labels),
-#         )
-#
-#         self.optimizer = Adam
-#         self.save_hyperparameters("training_arguments")
-#         self.save_hyperparameters("model_arguments")
-#
-#     def is_logger(self):
-#         return self.trainer.proc_rank <= 0
-#
-#     def forward(self, x):
-#         x = self.model(x)
-#         # x = F.log_softmax(x, dim=1)
-#         return x
-#
-#     def _step(self, batch):
-#         x, y = batch
-#         outputs = self.model(x)
-#         logits = F.log_softmax(outputs, dim=1)
-#         softmax_logits = F.softmax(outputs, dim=1)
-#         loss = F.nll_loss(logits, y)
-#         return loss, softmax_logits
-
-
-class ClassificationModelKD(pl.LightningModule):
+class ClassificationModel(pl.LightningModule):
     def __init__(self, training_arguments, model_arguments, other_arguments):
-        super(ClassificationModelKD, self).__init__()
+        super(ClassificationModel, self).__init__()
 
         self.training_arguments = training_arguments
         self.model_arguments = model_arguments
         self.other_arguments = other_arguments
-        # self.teacher_model = teacher_model
 
         self.dims = (1, 28, 28)
         channels, width, height = self.dims
@@ -87,20 +36,16 @@ class ClassificationModelKD(pl.LightningModule):
                 transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
-
-        self.tokenizer = T5Tokenizer.from_pretrained("t5-small")
-        self.model = T5ForConditionalGeneration.from_pretrained("t5-small")
-
-        # self.model = nn.Sequential(
-        #     nn.Flatten(),
-        #     nn.Linear(channels * width * height, self.model_arguments.fc1_size),
-        #     nn.ReLU(),
-        #     nn.Dropout(0.1),
-        #     nn.Linear(self.model_arguments.fc1_size, self.model_arguments.fc1_size),
-        #     nn.ReLU(),
-        #     nn.Dropout(0.1),
-        #     nn.Linear(self.model_arguments.fc1_size, self.model_arguments.num_labels),
-        # )
+        self.model = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(channels * width * height, self.model_arguments.fc1_size),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.model_arguments.fc1_size, self.model_arguments.fc1_size),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.model_arguments.fc1_size, self.model_arguments.num_labels),
+        )
 
         self.optimizer = Adam
         self.save_hyperparameters("training_arguments")
@@ -116,34 +61,64 @@ class ClassificationModelKD(pl.LightningModule):
 
     def _step(self, batch):
         x, y = batch
-        # with torch.no_grad():
-        #     output_teacher_batch = self.teacher_model(x)
+        outputs = self.model(x)
+        logits = F.log_softmax(outputs, dim=1)
+        softmax_logits = F.softmax(outputs, dim=1)
+        loss = F.nll_loss(logits, y)
+        return loss, softmax_logits
+
+
+class ClassificationModelKD(pl.LightningModule):
+    def __init__(self, training_arguments, model_arguments, other_arguments, teacher_model):
+        super(ClassificationModelKD, self).__init__()
+
+        self.training_arguments = training_arguments
+        self.model_arguments = model_arguments
+        self.other_arguments = other_arguments
+        self.teacher_model = teacher_model
+
+        self.dims = (1, 28, 28)
+        channels, width, height = self.dims
+        self.transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize((0.1307,), (0.3081,)),
+            ]
+        )
+        self.model = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(channels * width * height, self.model_arguments.fc1_size),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.model_arguments.fc1_size, self.model_arguments.fc1_size),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.model_arguments.fc1_size, self.model_arguments.num_labels),
+        )
+
+        self.optimizer = Adam
+        self.save_hyperparameters("training_arguments")
+        self.save_hyperparameters("model_arguments")
+
+    def is_logger(self):
+        return self.trainer.proc_rank <= 0
+
+    def forward(self, x):
+        x = self.model(x)
+        # x = F.log_softmax(x, dim=1)
+        return x
+
+    def _step(self, batch):
+        x, y = batch
+        with torch.no_grad():
+            output_teacher_batch = self.teacher_model(x)
 
         alpha = self.other_arguments.alpha_for_kd
         T = self.other_arguments.temperature_for_kd
 
-        # encoded_input = self.tokenizer(x, return_tensors='pt')
-
-        input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-        decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
-        decoder_input_ids = self.model._shift_right(decoder_input_ids)
-
-        inputs = {
-            "input_ids": input_ids,
-            "decoder_input_ids": decoder_input_ids
-        }
-        # the forward function automatically creates the correct decoder_input_ids
-        outputs = self.model(**inputs).loss
         outputs = self.model(x)
-        # loss.item()
-
-
-        # outputs = model(**encoded_input)
-        # outputs = self.model(x)
         logits = F.log_softmax(outputs, dim=1)
         softmax_logits = F.softmax(outputs, dim=1)
-
-        output_teacher_batch = y
 
         loss = torch.nn.KLDivLoss()(F.log_softmax(outputs / T, dim=1),
                                     F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
@@ -158,7 +133,7 @@ class ClassificationModelKD(pl.LightningModule):
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True)
         return {"loss": loss, "acc": acc}
 
-    def on_train_epoch_end(self, outputs):
+    def training_epoch_end(self, outputs):
         avg_loss = torch.cat([x['loss'].view(-1) for x in outputs]).mean()
         avg_acc = torch.cat([x['acc'].view(-1) for x in outputs]).mean()
 
@@ -182,7 +157,7 @@ class ClassificationModelKD(pl.LightningModule):
             "predictions": predicted_label.tolist(),
         }
 
-    def on_validation_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs):
         avg_loss = torch.cat([x['val_loss'].view(-1) for x in outputs]).mean()
         avg_acc = torch.cat([x['val_acc'].view(-1) for x in outputs]).mean()
 
@@ -218,10 +193,10 @@ class ClassificationModelKD(pl.LightningModule):
 
         return self.optimizer(self.parameters(), lr=self.other_arguments.learning_rate)
 
-    # def prepare_data(self):
+    def prepare_data(self):
         # download
-        # MNIST(self.other_arguments.data_dir, train=True, download=True)
-        # MNIST(self.other_arguments.data_dir, train=False, download=True)
+        MNIST(self.other_arguments.data_dir, train=True, download=True)
+        MNIST(self.other_arguments.data_dir, train=False, download=True)
 
     def setup(self, stage=None):
 
@@ -237,34 +212,27 @@ class ClassificationModelKD(pl.LightningModule):
         # if stage == "test" or stage is None:
         #     self.mnist_test = MNIST(self.other_arguments.data_dir, train=False, transform=self.transform)
 
-        # mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
-        dataset = load_dataset("csv", data_files="final_dataset.csv")
-
-        number_of_train_samples = len(dataset)
+        mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
+        number_of_train_samples = len(mnist_full)
         if (self.other_arguments.max_train_samples != -1):
             number_of_train_samples = min(self.other_arguments.max_train_samples, number_of_train_samples)
-        # self.mnist_train = torch.utils.data.Subset(dataset, [i for i in range(number_of_train_samples)])
-        # self.mnist_val = MNIST(self.other_arguments.data_dir, train=False, transform=self.transform)
+        self.mnist_train = torch.utils.data.Subset(mnist_full, [i for i in range(number_of_train_samples)])
+        self.mnist_val = MNIST(self.other_arguments.data_dir, train=False, transform=self.transform)
 
     def train_dataloader(self):
-        # dataloader = DataLoader(
-        #     self.mnist_train,
-        #     self.other_arguments.train_batch_size,
-        #     drop_last=False, shuffle=True,
-        #     num_workers=self.training_arguments.num_workers)
-        dataset = load_dataset("csv", data_files="final_dataset.csv")
-        dataset = dataset["train"]
-        # dataset = dataset.remove_columns(["idx", "task"])
-        dataloader = DataLoader(dataset, self.other_arguments.train_batch_size, drop_last=False,
-                                    shuffle=True, num_workers=self.training_arguments.num_workers)
+        dataloader = DataLoader(
+            self.mnist_train,
+            self.other_arguments.train_batch_size,
+            drop_last=False, shuffle=True,
+            num_workers=self.training_arguments.num_workers)
 
         return dataloader
 
-    # def val_dataloader(self):
+    def val_dataloader(self):
 
-        # return DataLoader(self.mnist_val,
-        #                   batch_size=self.other_arguments.eval_batch_size,
-        #                   num_workers=self.training_arguments.num_workers)
+        return DataLoader(self.mnist_val,
+                          batch_size=self.other_arguments.eval_batch_size,
+                          num_workers=self.training_arguments.num_workers)
 
 
 if __name__ == "__main__":
@@ -332,12 +300,12 @@ if __name__ == "__main__":
 
     pl.seed_everything(other_arguments.seed)
 
-    # teacher_model = ClassificationModel.load_from_checkpoint(checkpoint_path=other_arguments.teacher_model,
-    #                                                          other_arguments=None)
+    teacher_model = ClassificationModel.load_from_checkpoint(checkpoint_path=other_arguments.teacher_model,
+                                                             other_arguments=None)
     model = ClassificationModelKD(training_arguments=training_arguments,
                                 model_arguments=model_arguments,
-                                other_arguments=other_arguments)
-                                # teacher_model=teacher_model)
+                                other_arguments=other_arguments,
+                                teacher_model=teacher_model)
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=other_arguments.output_dir,
@@ -349,11 +317,11 @@ if __name__ == "__main__":
 
     train_params = dict(
         accumulate_grad_batches=other_arguments.gradient_accumulation_steps,
-        # gpus=training_arguments.n_gpu,
+        gpus=training_arguments.n_gpu,
         deterministic=True,
         max_epochs=other_arguments.num_train_epochs,
         precision=16 if training_arguments.fp_16 else 32,
-        # amp_level=training_arguments.opt_level,
+        amp_level=training_arguments.opt_level,
         gradient_clip_val=training_arguments.max_grad_norm,
         callbacks=[checkpoint_callback],
         fast_dev_run=other_arguments.do_fast_dev_run,
@@ -368,7 +336,5 @@ if __name__ == "__main__":
     if (training_arguments.distributed_backend != None):
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
-    print("here 1")
     trainer = pl.Trainer(**train_params)
-    print("here 2")
     trainer.fit(model)
