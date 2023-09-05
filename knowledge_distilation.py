@@ -124,30 +124,43 @@ class ClassificationModelKD(pl.LightningModule):
 
         # encoded_input = self.tokenizer(x, return_tensors='pt')
 
-        input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-        decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
-        decoder_input_ids = self.model._shift_right(decoder_input_ids)
+        # input_ids = self.tokenizer(x, return_tensors="pt").input_ids
+        # decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
+        # decoder_input_ids = self.model._shift_right(decoder_input_ids)
+        # add labels to the inputs, maybe decoder_output_ids
+
+        input_ids = self.tokenizer.encode(x, return_tensors="pt")
+        labels = self.tokenizer.encode(y, return_tensors="pt")
+
 
         inputs = {
             "input_ids": input_ids,
-            "decoder_input_ids": decoder_input_ids
+            # "decoder_input_ids": decoder_input_ids
+            "labels": labels
         }
         # the forward function automatically creates the correct decoder_input_ids
-        outputs = self.model(**inputs).loss
-        outputs = self.model(x)
+        # outputs = self.model(**inputs).loss
+        outputs = self.model(**inputs)
+        logits = outputs.logits
+        # outputs = self.model(x)
         # loss.item()
 
 
         # outputs = model(**encoded_input)
         # outputs = self.model(x)
-        logits = F.log_softmax(outputs, dim=1)
-        softmax_logits = F.softmax(outputs, dim=1)
+        # logits = F.log_softmax(outputs, dim=1)
+        softmax_logits = F.softmax(logits, dim=1)
+        labels_expanded = labels[:, :, None]
 
         output_teacher_batch = y
 
-        loss = torch.nn.KLDivLoss()(F.log_softmax(outputs / T, dim=1),
-                                    F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
-               F.nll_loss(logits, y) * (1. - alpha)
+        loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
+                                    F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
+               F.nll_loss(logits, labels) * (1. - alpha)
+
+        # loss = torch.nn.KLDivLoss()(F.log_softmax(logits / T, dim=1),
+        #                             F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
+        #        F.nll_loss(logits, y) * (1. - alpha)
         return loss, softmax_logits
 
     def training_step(self, batch, batch_idx):
@@ -239,6 +252,7 @@ class ClassificationModelKD(pl.LightningModule):
 
         # mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
         dataset = load_dataset("csv", data_files="final_dataset.csv")
+        # dataset = dataset.remove_columns("Unnamed: 0")
 
         number_of_train_samples = len(dataset)
         if (self.other_arguments.max_train_samples != -1):
