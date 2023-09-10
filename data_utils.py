@@ -19,7 +19,7 @@ def get_sentiment_task_results(sentiment_task, text):
     # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
     words_arr = [(result[0][0]['label'], result[0][0]['score']), (result[0][1]['label'], result[0][1]['score']),
                  (result[0][2]['label'], result[0][2]['score'])]
-    tensor = create_tensor_for_vocabulary(words_arr)
+    tensor = create_word_prob_encoding(words_arr)
     x = 1
     return tensor
 
@@ -47,7 +47,7 @@ def get_yesno_task_results(yesno_task, text):
     result = yesno_task(text, return_all_scores=True)
     # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
     words_arr = [(result[0][0]['label'], result[0][0]['score']), (result[0][1]['label'], result[0][1]['score'])]
-    tensor = create_tensor_for_vocabulary(words_arr)
+    tensor = create_word_prob_encoding(words_arr)
     return tensor
 
 def create_csv_data_yesno_model(starting_idx):
@@ -101,13 +101,22 @@ def find_index_of_word_in_vocabulary(word):
         word_index = tokenizer.get_vocab()[tokenized_word[0]]
     return word_index
 
-def create_tensor_for_vocabulary(words_arr):
-    words_tensor = [0 for i in range(32128)]
-    for word, prob in words_arr:
+# def create_word_prob_encoding(words_arr):
+#     words_tensor = [0 for i in range(32128)]
+#     for word, prob in words_arr:
+#         word_index = find_index_of_word_in_vocabulary(word)
+#         words_tensor[word_index] = prob
+#         print(word, ": ", word_index)
+#     return words_tensor
+
+def create_word_prob_encoding(words_arr):
+    words_tensor_arr = [("", 0) for i in range(len(words_arr))]
+    for i in range(len(words_arr)):
+        word, prob = words_arr[i]
         word_index = find_index_of_word_in_vocabulary(word)
-        words_tensor[word_index] = prob
+        words_tensor_arr[i] = (word_index, prob)
         print(word, ": ", word_index)
-    return words_tensor
+    return words_tensor_arr
 
 curr_idx = create_csv_data_sentiment_model()
 create_csv_data_yesno_model(curr_idx)

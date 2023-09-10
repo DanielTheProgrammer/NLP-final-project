@@ -14,6 +14,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model
 from datasets import load_dataset, concatenate_datasets
+import ast
 
 
 def compute_accuracy(logits, labels):
@@ -114,10 +115,19 @@ class ClassificationModelKD(pl.LightningModule):
         # x = F.log_softmax(x, dim=1)
         return x
 
+    def create_y_tensor(self, y):
+        y_arr = ast.literal_eval(y)
+        y_tensor = torch.zeros(32128)
+        for idx, prob in y_arr:
+            idx = int(idx)
+            y_tensor[idx] = prob
+        return y_tensor
+
     def _step(self, batch):
         x, y = batch
         # with torch.no_grad():
         #     output_teacher_batch = self.teacher_model(x)
+        y = self.create_y_tensor(y)
 
         alpha = self.other_arguments.alpha_for_kd
         T = self.other_arguments.temperature_for_kd
@@ -162,6 +172,7 @@ class ClassificationModelKD(pl.LightningModule):
         #                             F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
         #        F.nll_loss(logits, y) * (1. - alpha)
         return loss, softmax_logits
+
 
     def training_step(self, batch, batch_idx):
         x, y = batch
