@@ -117,10 +117,10 @@ class ClassificationModelKD(pl.LightningModule):
 
     def create_y_tensor(self, y):
         y_arr = ast.literal_eval(y)
-        y_tensor = torch.zeros(32128)
+        y_tensor = torch.zeros(1, 32128)
         for idx, prob in y_arr:
             idx = int(idx)
-            y_tensor[idx] = prob
+            y_tensor[0][idx] = prob
         return y_tensor
 
     def _step(self, batch):
@@ -140,7 +140,10 @@ class ClassificationModelKD(pl.LightningModule):
         # add labels to the inputs, maybe decoder_output_ids
 
         input_ids = self.tokenizer.encode(x, return_tensors="pt")
-        labels = self.tokenizer.encode(y, return_tensors="pt")
+        input_ids = input_ids.type(torch.LongTensor)
+        # labels = self.tokenizer.encode(y, return_tensors="pt")
+        labels = y.type(torch.LongTensor)
+        # labels = y
 
 
         inputs = {
