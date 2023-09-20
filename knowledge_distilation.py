@@ -140,11 +140,12 @@ class ClassificationModelKD(pl.LightningModule):
         # add labels to the inputs, maybe decoder_output_ids
 
         input_ids = self.tokenizer.encode(x, return_tensors="pt")
-        input_ids = input_ids.type(torch.LongTensor)
+        # input_ids = input_ids.type(torch.LongTensor)
+        # input_ids = input_ids.to_sparse()
         # labels = self.tokenizer.encode(y, return_tensors="pt")
-        labels = y.type(torch.LongTensor)
-        # labels = y
-
+        # labels = y.type(torch.LongTensor)
+        # labels = labels.to_sparse()
+        labels = y
 
         inputs = {
             "input_ids": input_ids,
@@ -396,7 +397,5 @@ if __name__ == "__main__":
     if (training_arguments.distributed_backend != None):
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
-    print("here 1")
     trainer = pl.Trainer(**train_params)
-    print("here 2")
     trainer.fit(model)
