@@ -67,25 +67,33 @@ paraphrase_pipeline = pipeline("text-generation", model=model,tokenizer=tokenize
 # output = pipe("question: Which is capital city of India? context: New Delhi is India's capital")
 # print(output)
 
-#      ------------------------ Paraphrase Generation: option 3 -------------------------------- #
-
+# #      ------------------------ Paraphrase Generation: option 3 -------------------------------- #
+#
 # tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
 # model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws", return_dict_in_generate=True)
-
-# Load model directly
+#
+# # Load model directly
 # from transformers import AutoTokenizer, AutoModelForSequenceClassification
 #
-# tokenizer = AutoTokenizer.from_pretrained("nc33/yes_no_qna_deberta_model")
-# model = AutoModelForSequenceClassification.from_pretrained("nc33/yes_no_qna_deberta_model")
+# # tokenizer = AutoTokenizer.from_pretrained("nc33/yes_no_qna_deberta_model")
+# # model = AutoModelForSequenceClassification.from_pretrained("nc33/yes_no_qna_deberta_model")
 #
 # # gpt2 = AutoModelForCausalLM.from_pretrained("gpt2", return_dict_in_generate=True)
 # # tokenizer = AutoTokenizer.from_pretrained("gpt2")
-#
+# #
 # input_ids = tokenizer("I think it's a great idea", return_tensors="pt").input_ids
+# #
+# generated_outputs = model.generate(input_ids, do_sample=True, num_return_sequences=6, output_scores=True,
+#                                    return_dict_in_generate=True)
+# probs = torch.stack(generated_outputs.scores, dim=1).softmax(-1)
 #
-# generated_outputs = model.generate(input_ids, do_sample=True, num_return_sequences=4, output_scores=True)
-# transition_scores = model.compute_transition_scores(generated_outputs.sequences, generated_outputs.scores, normalize_logits=True)
-#
+# gen_sequences = generated_outputs.sequences[:, input_ids.shape[-1]:]
+# gen_probs = torch.gather(probs, 2, gen_sequences[:, :, None]).squeeze(-1)
+
+# # transition_scores = model.compute_transition_scores(generated_outputs.sequences, generated_outputs.scores, normalize_logits=True)
+# print(gen_probs)
+# print(torch.sum(gen_probs[0]))
+
 # # input_length is the length of the input prompt for decoder-only models, like the GPT family, and 1 for
 # # encoder-decoder models, like BART or T5.
 # input_length = 1 if model.config.is_encoder_decoder else input_ids.input_ids.shape[1]
@@ -127,9 +135,39 @@ paraphrase_pipeline = pipeline("text-generation", model=model,tokenizer=tokenize
 # unique_normed_prob_per_sequence = normed_gen_probs.prod(-1)
 
 # Use a pipeline as a high-level helper
-pipe = pipeline("text-classification", model="nc33/yes_no_qna_deberta_model")
-output = pipe("Is New Delhi the capital of India?")
-print(output)
+# pipe = pipeline("text-classification", model="nc33/yes_no_qna_deberta_model")
+# output = pipe("Is New Delhi the capital of India?")
+# print(output)
 
 
+#      ------------------------ T5 get probabilities -------------------------------- #
 
+tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws", return_dict_in_generate=True)
+
+vocabulary = tokenizer.get_vocab()
+labels = list(vocabulary.keys())
+
+# labels = torch.tensor(list(vocabulary.keys()))
+class_ids = torch.LongTensor(tokenizer(labels, padding=True).input_ids)
+
+encoding = tokenizer("I think it's a great idea",
+                     return_tensors="pt", return_length=True)
+
+generated_outputs = model.generate(encoding.input_ids, do_sample=False, output_scores=True,
+                                   return_dict_in_generate=True)
+
+logits = []
+# Generate the logits for each token in the generated output sequence.
+# `scores` has size [batch, seq_length, vocab_size]
+scores = torch.stack(generated_outputs.scores, dim=1)
+
+# transpose and expand to match the dimensions
+score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
+probabilities = score_of_labels.nanmean(dim=1).softmax(1)
+
+max_probability_index = torch.argmax(probabilities, dim=1)[0]
+
+# entailment = labels[max_probability_index]
+probability = probabilities[0, max_probability_index].item()
+print(probabilities)

@@ -15,12 +15,24 @@ from torchvision.datasets import MNIST
 from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model
 from datasets import load_dataset, concatenate_datasets
 import ast
+import Distilation_Trainer
 
 
 def compute_accuracy(logits, labels):
     predicted_label = logits.max(dim=1)[1]
-    acc = (predicted_label == labels).float().mean()
+    y = create_y_tensor(labels)
+
+    acc = (predicted_label == y).float().mean()
+    x = 1
     return acc, predicted_label
+
+def create_y_tensor(y):
+    y_arr = ast.literal_eval(y)
+    y_tensor = torch.zeros(1, 32128)
+    for idx, prob in y_arr:
+        idx = int(idx)
+        y_tensor[0][idx] = prob
+    return y_tensor
 
 
 # class ClassificationModel(pl.LightningModule):
@@ -115,19 +127,11 @@ class ClassificationModelKD(pl.LightningModule):
         # x = F.log_softmax(x, dim=1)
         return x
 
-    def create_y_tensor(self, y):
-        y_arr = ast.literal_eval(y)
-        y_tensor = torch.zeros(1, 32128)
-        for idx, prob in y_arr:
-            idx = int(idx)
-            y_tensor[0][idx] = prob
-        return y_tensor
-
     def _step(self, batch):
         x, y = batch
         # with torch.no_grad():
         #     output_teacher_batch = self.teacher_model(x)
-        y = self.create_y_tensor(y)
+        # y = self.create_y_tensor(y)
 
         alpha = self.other_arguments.alpha_for_kd
         T = self.other_arguments.temperature_for_kd
@@ -135,7 +139,7 @@ class ClassificationModelKD(pl.LightningModule):
         # encoded_input = self.tokenizer(x, return_tensors='pt')
 
         # input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-        # decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
+        decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
         # decoder_input_ids = self.model._shift_right(decoder_input_ids)
         # add labels to the inputs, maybe decoder_output_ids
 
@@ -145,15 +149,15 @@ class ClassificationModelKD(pl.LightningModule):
         # labels = self.tokenizer.encode(y, return_tensors="pt")
         # labels = y.type(torch.LongTensor)
         # labels = labels.to_sparse()
-        labels = y
+        # labels = y
 
         inputs = {
             "input_ids": input_ids,
-            # "decoder_input_ids": decoder_input_ids
-            "labels": labels
+            "decoder_input_ids": decoder_input_ids
+            # "labels": labels
         }
         # the forward function automatically creates the correct decoder_input_ids
-        # outputs = self.model(**inputs).loss
+        loss = self.model(**inputs).loss
         outputs = self.model(**inputs)
         logits = outputs.logits
         # outputs = self.model(x)
@@ -164,13 +168,13 @@ class ClassificationModelKD(pl.LightningModule):
         # outputs = self.model(x)
         # logits = F.log_softmax(outputs, dim=1)
         softmax_logits = F.softmax(logits, dim=1)
-        labels_expanded = labels[:, :, None]
+        # labels_expanded = labels[:, :, None]
 
         output_teacher_batch = y
 
-        loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
-                                    F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
-               F.nll_loss(logits, labels) * (1. - alpha)
+        # loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
+        #                             F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
+        #        F.nll_loss(logits, labels) * (1. - alpha)
 
         # loss = torch.nn.KLDivLoss()(F.log_softmax(logits / T, dim=1),
         #                             F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
@@ -181,6 +185,7 @@ class ClassificationModelKD(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         loss, logits = self._step(batch)
+        logits = self.calculate_T5_probabilities(x)
         acc, predicted_label = compute_accuracy(logits, y)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True)
@@ -295,6 +300,31 @@ class ClassificationModelKD(pl.LightningModule):
         #                   batch_size=self.other_arguments.eval_batch_size,
         #                   num_workers=self.training_arguments.num_workers)
 
+    def calculate_T5_probabilities(self, input):
+        vocabulary = self.tokenizer.get_vocab()
+        labels = list(vocabulary.keys())
+        class_ids = torch.LongTensor(self.tokenizer(labels, padding=True).input_ids)
+
+        encoding = self.tokenizer(input, return_tensors="pt", return_length=True)
+
+        generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
+                                           return_dict_in_generate=True)
+
+        logits = []
+        # Generate the logits for each token in the generated output sequence.
+        # `scores` has size [batch, seq_length, vocab_size]
+        scores = torch.stack(generated_outputs.scores, dim=1)
+
+        # transpose and expand to match the dimensions
+        score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
+        probabilities = score_of_labels.nanmean(dim=1).softmax(1)
+
+        max_probability_index = torch.argmax(probabilities, dim=1)[0]
+
+        # entailment = labels[max_probability_index]
+        probability = probabilities[0, max_probability_index].item()
+        return probabilities
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -397,5 +427,6 @@ if __name__ == "__main__":
     if (training_arguments.distributed_backend != None):
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
+    # trainer = Distilation_Trainer.DistilationTrainer(**train_params)
     trainer = pl.Trainer(**train_params)
     trainer.fit(model)
