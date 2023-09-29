@@ -20,10 +20,10 @@ import Distilation_Trainer
 
 def compute_accuracy(logits, labels):
     predicted_label = logits.max(dim=1)[1]
-    y = create_y_tensor(labels)
+    y_tensor = create_y_tensor(labels)
+    teacher_label = y_tensor.max(dim=1)[1]
 
-    acc = (predicted_label == y).float().mean()
-    x = 1
+    acc = (predicted_label == teacher_label)
     return acc, predicted_label
 
 def create_y_tensor(y):
