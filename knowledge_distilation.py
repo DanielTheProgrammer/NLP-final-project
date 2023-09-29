@@ -28,12 +28,28 @@ def compute_accuracy(logits, labels):
 
 def create_y_tensor(y):
     y_arr = ast.literal_eval(y)
-    y_tensor = torch.zeros(1, 32128)
+    y_tensor = torch.zeros(1, 32100)
     for idx, prob in y_arr:
         idx = int(idx)
         y_tensor[0][idx] = prob
     return y_tensor
 
+
+def compute_loss(student_distribution, y, T, alpha):
+    # calculate the T5 model probabilities over the input
+    # T5_probabilities = model.calculate_T5_probabilities(inputs)
+    # logits = student_distribution.logits
+    teacher_distribution = create_y_tensor(y)
+
+    # custom_loss = torch.nn.KLDivLoss()
+    custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
+                                       F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T)
+
+    # custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
+    #                                    F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T) + \
+    #        F.nll_loss(student_distribution, teacher_distribution) * (1. - alpha)
+    # custom_loss = ...
+    return custom_loss
 
 # class ClassificationModel(pl.LightningModule):
 #     def __init__(self, training_arguments, model_arguments, other_arguments):
@@ -157,7 +173,11 @@ class ClassificationModelKD(pl.LightningModule):
             # "labels": labels
         }
         # the forward function automatically creates the correct decoder_input_ids
-        loss = self.model(**inputs).loss
+
+        student_distribution = self.calculate_student_model_distribution(x)
+        loss = compute_loss(student_distribution, y, T, alpha)
+
+        # loss = self.model(**inputs).compute_loss()
         outputs = self.model(**inputs)
         logits = outputs.logits
         # outputs = self.model(x)
@@ -185,10 +205,10 @@ class ClassificationModelKD(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         loss, logits = self._step(batch)
-        logits = self.calculate_T5_probabilities(x)
+        logits = self.calculate_student_model_distribution(x)
         acc, predicted_label = compute_accuracy(logits, y)
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
+        self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         return {"loss": loss, "acc": acc}
 
     def on_train_epoch_end(self, outputs):
@@ -300,7 +320,7 @@ class ClassificationModelKD(pl.LightningModule):
         #                   batch_size=self.other_arguments.eval_batch_size,
         #                   num_workers=self.training_arguments.num_workers)
 
-    def calculate_T5_probabilities(self, input):
+    def calculate_student_model_distribution(self, input):
         vocabulary = self.tokenizer.get_vocab()
         labels = list(vocabulary.keys())
         class_ids = torch.LongTensor(self.tokenizer(labels, padding=True).input_ids)
@@ -427,6 +447,10 @@ if __name__ == "__main__":
     if (training_arguments.distributed_backend != None):
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
-    # trainer = Distilation_Trainer.DistilationTrainer(**train_params)
-    trainer = pl.Trainer(**train_params)
+    # dataLoader = model.train_dataloader()
+
+    trainer = Distilation_Trainer.DistilationTrainer(**train_params)
+    # trainer = pl.Trainer(**train_params)
     trainer.fit(model)
+
+

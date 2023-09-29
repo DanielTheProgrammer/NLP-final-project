@@ -60,7 +60,6 @@ from pytorch_lightning.utilities.types import (
 )
 
 
-
 class DistilationTrainer(pl.Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -77,20 +76,20 @@ class DistilationTrainer(pl.Trainer):
         self.float_labels = model.train_dataloader()
         super().fit(model, val_dataloaders, datamodule, ckpt_path)
 
-    def compute_loss(self, model, inputs, T, alpha):
-        # implement custom logic here
-
-        # calculate the T5 model probabilities over the input
-        T5_probabilities = model.calculate_T5_probabilities(inputs)
-        logits = T5_probabilities.logits
-
-        # Calculate KL loss between the T5 probabilities and the desired probabilities.
-        # custom_loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
-        #                             F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
-        #        F.nll_loss(logits, labels) * (1. - alpha)
-
-        custom_loss = torch.nn.KLDivLoss()(F.log_softmax(T5_probabilities / T, dim=1),
-                                    F.softmax(self.float_labels / T, dim=1)) * (alpha * T * T) + \
-               F.nll_loss(logits, self.float_labels) * (1. - alpha)
-        # custom_loss = ...
-        return custom_loss
+    # def compute_loss(self, model, inputs, T, alpha):
+    #     # implement custom logic here
+    #
+    #     # calculate the T5 model probabilities over the input
+    #     T5_probabilities = model.calculate_T5_probabilities(inputs)
+    #     logits = T5_probabilities.logits
+    #
+    #     # Calculate KL loss between the T5 probabilities and the desired probabilities.
+    #     # custom_loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
+    #     #                             F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
+    #     #        F.nll_loss(logits, labels) * (1. - alpha)
+    #
+    #     custom_loss = torch.nn.KLDivLoss()(F.log_softmax(T5_probabilities / T, dim=1),
+    #                                 F.softmax(self.float_labels / T, dim=1)) * (alpha * T * T) + \
+    #            F.nll_loss(logits, self.float_labels) * (1. - alpha)
+    #     # custom_loss = ...
+    #     return custom_loss
