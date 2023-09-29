@@ -44,7 +44,7 @@ def compute_loss(student_distribution, y, T, alpha):
     # custom_loss = torch.nn.KLDivLoss()
     custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
                                        F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T)
-
+    custom_loss.requires_grad = True
     # custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
     #                                    F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T) + \
     #        F.nll_loss(student_distribution, teacher_distribution) * (1. - alpha)
@@ -211,14 +211,14 @@ class ClassificationModelKD(pl.LightningModule):
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         return {"loss": loss, "acc": acc}
 
-    def on_train_epoch_end(self, outputs):
-        avg_loss = torch.cat([x['loss'].view(-1) for x in outputs]).mean()
-        avg_acc = torch.cat([x['acc'].view(-1) for x in outputs]).mean()
-
-        print("--------------------")
-        print("Train avg_loss: ", avg_loss)
-        print("Train avg_acc: ", avg_acc)
-        print("--------------------")
+    # def on_train_epoch_end(self, outputs):
+    #     avg_loss = torch.cat([x['loss'].view(-1) for x in outputs]).mean()
+    #     avg_acc = torch.cat([x['acc'].view(-1) for x in outputs]).mean()
+    #
+    #     print("--------------------")
+    #     print("Train avg_loss: ", avg_loss)
+    #     print("Train avg_acc: ", avg_acc)
+    #     print("--------------------")
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
