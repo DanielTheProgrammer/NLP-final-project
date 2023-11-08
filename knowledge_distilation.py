@@ -155,43 +155,42 @@ class ClassificationModelKD(pl.LightningModule):
         # encoded_input = self.tokenizer(x, return_tensors='pt')
 
         # input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-        decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
+        # decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
         # decoder_input_ids = self.model._shift_right(decoder_input_ids)
         # add labels to the inputs, maybe decoder_output_ids
 
-        input_ids = self.tokenizer.encode(x, return_tensors="pt")
+        # input_ids = self.tokenizer.encode(x, return_tensors="pt")
         # input_ids = input_ids.type(torch.LongTensor)
         # input_ids = input_ids.to_sparse()
         # labels = self.tokenizer.encode(y, return_tensors="pt")
         # labels = y.type(torch.LongTensor)
         # labels = labels.to_sparse()
         # labels = y
-
-        inputs = {
-            "input_ids": input_ids,
-            "decoder_input_ids": decoder_input_ids
-            # "labels": labels
-        }
+        #
+        # inputs = {
+        #     "input_ids": input_ids,
+        #     "decoder_input_ids": decoder_input_ids
+        #     # "labels": labels
+        # }
         # the forward function automatically creates the correct decoder_input_ids
 
         student_distribution = self.calculate_student_model_distribution(x)
         loss = compute_loss(student_distribution, y, T, alpha)
 
         # loss = self.model(**inputs).compute_loss()
-        outputs = self.model(**inputs)
-        logits = outputs.logits
+        # outputs = self.model(**inputs)
+        # logits = outputs.logits
         # outputs = self.model(x)
         # loss.item()
-
+        # logits = student_distribution
 
         # outputs = model(**encoded_input)
         # outputs = self.model(x)
         # logits = F.log_softmax(outputs, dim=1)
-        softmax_logits = F.softmax(logits, dim=1)
+        # softmax_logits = F.softmax(logits, dim=1)
         # labels_expanded = labels[:, :, None]
 
-        output_teacher_batch = y
-
+        # output_teacher_batch = y
         # loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
         #                             F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
         #        F.nll_loss(logits, labels) * (1. - alpha)
@@ -199,13 +198,13 @@ class ClassificationModelKD(pl.LightningModule):
         # loss = torch.nn.KLDivLoss()(F.log_softmax(logits / T, dim=1),
         #                             F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
         #        F.nll_loss(logits, y) * (1. - alpha)
-        return loss, softmax_logits
+        return loss, student_distribution
 
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         loss, logits = self._step(batch)
-        logits = self.calculate_student_model_distribution(x)
+        # logits = self.calculate_student_model_distribution(x)
         acc, predicted_label = compute_accuracy(logits, y)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
@@ -291,7 +290,10 @@ class ClassificationModelKD(pl.LightningModule):
         #     self.mnist_test = MNIST(self.other_arguments.data_dir, train=False, transform=self.transform)
 
         # mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
+        # dataset = load_dataset("csv", data_files="final_dataset.csv")
+
         dataset = load_dataset("csv", data_files="final_dataset.csv")
+
         # dataset = dataset.remove_columns("Unnamed: 0")
 
         number_of_train_samples = len(dataset)
@@ -306,7 +308,10 @@ class ClassificationModelKD(pl.LightningModule):
         #     self.other_arguments.train_batch_size,
         #     drop_last=False, shuffle=True,
         #     num_workers=self.training_arguments.num_workers)
+        # dataset = load_dataset("csv", data_files="final_dataset.csv")
+
         dataset = load_dataset("csv", data_files="final_dataset.csv")
+
         dataset = dataset["train"]
         # dataset = dataset.remove_columns(["idx", "task"])
         dataloader = DataLoader(dataset, self.other_arguments.train_batch_size, drop_last=False,
@@ -323,14 +328,25 @@ class ClassificationModelKD(pl.LightningModule):
     def calculate_student_model_distribution(self, input):
         vocabulary = self.tokenizer.get_vocab()
         labels = list(vocabulary.keys())
-        class_ids = torch.LongTensor(self.tokenizer(labels, padding=True).input_ids)
+        class_ids = torch.LongTensor(self.tokenizer(labels, padding="longest").input_ids)
+
+
+        # class_ids = nn.ZeroPad2d((0, 200 - class_ids.size()[1]))(class_ids)
+
 
         encoding = self.tokenizer(input, return_tensors="pt", return_length=True)
 
+        # encoding_ids = nn.ZeroPad2d((0, 200 - encoding.input_ids.size()[1]))(encoding.input_ids)
+        # generated_outputs = self.model.generate(encoding_ids, do_sample=False, output_scores=True,
+        #                                    return_dict_in_generate=True)
+
+
         generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
                                            return_dict_in_generate=True)
+        while len(generated_outputs.scores) <= 4:
+            generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
+                                                    return_dict_in_generate=True)
 
-        logits = []
         # Generate the logits for each token in the generated output sequence.
         # `scores` has size [batch, seq_length, vocab_size]
         scores = torch.stack(generated_outputs.scores, dim=1)
@@ -339,10 +355,10 @@ class ClassificationModelKD(pl.LightningModule):
         score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
         probabilities = score_of_labels.nanmean(dim=1).softmax(1)
 
-        max_probability_index = torch.argmax(probabilities, dim=1)[0]
+        # max_probability_index = torch.argmax(probabilities, dim=1)[0]
 
         # entailment = labels[max_probability_index]
-        probability = probabilities[0, max_probability_index].item()
+        # probability = probabilities[0, max_probability_index].item()
         return probabilities
 
 
@@ -374,7 +390,7 @@ if __name__ == "__main__":
     other_arguments.add_argument("--train_batch_size", default=2, type=int)
     other_arguments.add_argument("--eval_batch_size", default=2, type=int)
     other_arguments.add_argument("--max_train_samples", default=-1, type=int)
-    other_arguments.add_argument("--num_train_epochs", default=2, type=int)
+    other_arguments.add_argument("--num_train_epochs", default=4, type=int)
     other_arguments.add_argument("--gradient_accumulation_steps", default=1, type=int)
     other_arguments.add_argument("--seed", default=42, type=int)
     other_arguments.add_argument("--save_top_k", default=-1, type=int)
