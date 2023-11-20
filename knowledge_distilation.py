@@ -206,7 +206,7 @@ class ClassificationModelKD(pl.LightningModule):
         loss, logits = self._step(batch)
         # logits = self.calculate_student_model_distribution(x)
         acc, predicted_label = compute_accuracy(logits, y)
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
+        self.log('train_loss_inbal', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         return {"loss": loss, "acc": acc}
 
@@ -341,7 +341,7 @@ class ClassificationModelKD(pl.LightningModule):
         #                                    return_dict_in_generate=True)
 
 
-        generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
+        generated_outputs = self.model.generate(encoding.input_ids, do_sample=True,num_beams=6, output_scores=True,
                                            return_dict_in_generate=True)
         while len(generated_outputs.scores) <= 4:
             generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
