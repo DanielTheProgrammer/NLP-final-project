@@ -19,12 +19,21 @@ import Distilation_Trainer
 
 
 def compute_accuracy(logits, labels):
-    predicted_label = logits.max(dim=1)[1]
+    # predicted_label = logits.max(dim=1)[1]
+    predicted_label = logits.max(dim=1)[1][0]
+    newTorch = torch.zeros(1, )
+    newTorch[0] = predicted_label[0]
+
     y_tensor = create_y_tensor(labels)
     teacher_label = y_tensor.max(dim=1)[1]
 
-    acc = (predicted_label == teacher_label)
-    return acc, predicted_label
+    # acc = (predicted_label == teacher_label)
+    acc = (newTorch == teacher_label)
+    if acc[0]:
+        accValue = 1
+    else:
+        accValue = 0
+    return accValue, predicted_label
 
 def create_y_tensor(y):
     y_arr = ast.literal_eval(y)
@@ -39,10 +48,12 @@ def compute_loss(student_distribution, y, T, alpha):
     # calculate the T5 model probabilities over the input
     # T5_probabilities = model.calculate_T5_probabilities(inputs)
     # logits = student_distribution.logits
+
+    filtered_student_distribution = student_distribution[0][0:3]
     teacher_distribution = create_y_tensor(y)
 
     # custom_loss = torch.nn.KLDivLoss()
-    custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
+    custom_loss = torch.nn.KLDivLoss()(F.log_softmax(filtered_student_distribution / T, dim=1),
                                        F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T)
     custom_loss.requires_grad = True
     # custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
@@ -135,6 +146,8 @@ class ClassificationModelKD(pl.LightningModule):
         self.save_hyperparameters("training_arguments")
         self.save_hyperparameters("model_arguments")
 
+        self.loss_values_list = []
+
     def is_logger(self):
         return self.trainer.proc_rank <= 0
 
@@ -208,6 +221,8 @@ class ClassificationModelKD(pl.LightningModule):
         acc, predicted_label = compute_accuracy(logits, y)
         self.log('train_loss_inbal', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
+
+        self.loss_values_list += [loss, acc, self.trainer.current_epoch, self.trainer.global_step]
         return {"loss": loss, "acc": acc}
 
     # def on_train_epoch_end(self, outputs):
@@ -353,8 +368,8 @@ class ClassificationModelKD(pl.LightningModule):
 
         # transpose and expand to match the dimensions
         score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
-        probabilities = score_of_labels.nanmean(dim=1).softmax(1)
-
+        # probabilities = score_of_labels.nanmean(dim=1).softmax(1)
+        probabilities = score_of_labels.softmax(2)
         # max_probability_index = torch.argmax(probabilities, dim=1)[0]
 
         # entailment = labels[max_probability_index]
@@ -469,4 +484,14 @@ if __name__ == "__main__":
     # trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
+    values_list = model.loss_values_list
+    # open file
+    with open('loss_values.txt', 'w+') as f:
+        # write elements of list
+        for items in values_list:
+            for value in items:
+                f.write('%s,' % value)
+            f.write('\n')
+        print("File written successfully")
+    f.close()
 
