@@ -17,7 +17,6 @@ from datasets import load_dataset, concatenate_datasets
 import ast
 import Distilation_Trainer
 
-
 def compute_accuracy(logits, labels):
     # predicted_label = logits.max(dim=1)[1]
     predicted_label = logits.max(dim=1)[1][0]
@@ -223,6 +222,14 @@ class ClassificationModelKD(pl.LightningModule):
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
 
         self.loss_values_list += [loss, acc, self.trainer.current_epoch, self.trainer.global_step]
+        parameters = [loss, acc, self.trainer.current_epoch, self.trainer.global_step]
+
+        file = open("loss_values.txt", "a")
+        for parameter in parameters:
+            file.write('%s,' % parameter)
+        file.write('\n')
+        file.close()
+
         return {"loss": loss, "acc": acc}
 
     # def on_train_epoch_end(self, outputs):
@@ -479,19 +486,22 @@ if __name__ == "__main__":
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
     # dataLoader = model.train_dataloader()
+    file = open("loss_values.txt", "w")
+    file.writelines("loss,accuracy,epoch,step")
+    file.close()
 
     trainer = Distilation_Trainer.DistilationTrainer(**train_params)
     # trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
-    values_list = model.loss_values_list
-    # open file
-    with open('loss_values.txt', 'w+') as f:
-        # write elements of list
-        for items in values_list:
-            for value in items:
-                f.write('%s,' % value)
-            f.write('\n')
-        print("File written successfully")
-    f.close()
+    # values_list = model.loss_values_list
+    # # open file
+    # with open('loss_values.txt', 'w+') as f:
+    #     # write elements of list
+    #     for items in values_list:
+    #         for value in items:
+    #             f.write('%s,' % value)
+    #         f.write('\n')
+    #     print("File written successfully")
+    # f.close()
 
