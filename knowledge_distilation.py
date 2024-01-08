@@ -17,22 +17,52 @@ from datasets import load_dataset, concatenate_datasets
 import ast
 import Distilation_Trainer
 
-def compute_accuracy(logits, labels):
+def compute_accuracy(student_distribution, labels):
     # predicted_label = logits.max(dim=1)[1]
-    predicted_label = logits.max(dim=1)[1][0]
-    newTorch = torch.zeros(1, )
-    newTorch[0] = predicted_label[0]
+    # predicted_label_tensor = student_distribution.max(dim=1)[1][0]
+    max_predicted_probability, max_predicted_label = torch.max(student_distribution[0][0], dim=0)
+    # predicted_label_index = torch.zeros(1, )
+    # predicted_label_index[0] = predicted_label_tensor[0]
 
-    y_tensor = create_y_tensor(labels)
-    teacher_label = y_tensor.max(dim=1)[1]
+    teacher_distribution_tensor = create_y_tensor(labels)
+    # teacher_label_index = teacher_distribution_tensor.max(dim=1)[1]
+    teacher_label_index = teacher_distribution_tensor.max(dim=1)[1][0]
 
     # acc = (predicted_label == teacher_label)
-    acc = (newTorch == teacher_label)
-    if acc[0]:
+    # acc = (predicted_label_index == teacher_label_index)
+    acc = (max_predicted_label == teacher_label_index)
+    if acc:
         accValue = 1
     else:
         accValue = 0
-    return accValue, predicted_label
+
+    file = open("word_10747_student_probability.txt", "a")
+    file.write('%f' % student_distribution[0][0][10747])
+    file.write('\n')
+    file.close()
+
+    return accValue, max_predicted_label
+
+
+# def compute_accuracy(student_distribution, labels):
+#     # compute accuracy using the distance between the words' logits
+#     predicted_label_tensor = student_distribution.max(dim=1)[1][0]
+#     predicted_label_index = torch.zeros(1, )
+#     predicted_label_index[0] = predicted_label_tensor[0]
+#
+#     teacher_distribution_tensor = create_y_tensor(labels)
+#     teacher_label_index = teacher_distribution_tensor.max(dim=1)[1]
+#
+#     # find logits:
+#
+#     compute_loss
+#     # acc = (predicted_label == teacher_label)
+#     acc = (predicted_label_index == teacher_label_index)
+#     if acc[0]:
+#         accValue = 1
+#     else:
+#         accValue = 0
+#     return accValue, predicted_label_tensor
 
 def create_y_tensor(y):
     y_arr = ast.literal_eval(y)
@@ -48,13 +78,14 @@ def compute_loss(student_distribution, y, T, alpha):
     # T5_probabilities = model.calculate_T5_probabilities(inputs)
     # logits = student_distribution.logits
 
-    filtered_student_distribution = student_distribution[0][0:3]
+    # filtered_student_distribution = student_distribution[0][0:3]
+    filtered_student_distribution = student_distribution[0][0].reshape(1, -1)
     teacher_distribution = create_y_tensor(y)
 
     # custom_loss = torch.nn.KLDivLoss()
     custom_loss = torch.nn.KLDivLoss()(F.log_softmax(filtered_student_distribution / T, dim=1),
                                        F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T)
-    custom_loss.requires_grad = True
+    # custom_loss.requires_grad = True
     # custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
     #                                    F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T) + \
     #        F.nll_loss(student_distribution, teacher_distribution) * (1. - alpha)
@@ -229,7 +260,6 @@ class ClassificationModelKD(pl.LightningModule):
             file.write('%s,' % parameter)
         file.write('\n')
         file.close()
-
         return {"loss": loss, "acc": acc}
 
     # def on_train_epoch_end(self, outputs):
@@ -314,7 +344,7 @@ class ClassificationModelKD(pl.LightningModule):
         # mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
         # dataset = load_dataset("csv", data_files="final_dataset.csv")
 
-        dataset = load_dataset("csv", data_files="final_dataset.csv")
+        dataset = load_dataset("csv", data_files="final_dataset_1_example.csv")
 
         # dataset = dataset.remove_columns("Unnamed: 0")
 
@@ -332,7 +362,7 @@ class ClassificationModelKD(pl.LightningModule):
         #     num_workers=self.training_arguments.num_workers)
         # dataset = load_dataset("csv", data_files="final_dataset.csv")
 
-        dataset = load_dataset("csv", data_files="final_dataset.csv")
+        dataset = load_dataset("csv", data_files="final_dataset_1_example.csv")
 
         dataset = dataset["train"]
         # dataset = dataset.remove_columns(["idx", "task"])
@@ -357,25 +387,30 @@ class ClassificationModelKD(pl.LightningModule):
 
 
         encoding = self.tokenizer(input, return_tensors="pt", return_length=True)
+        labels = self.tokenizer(input, return_tensors="pt").input_ids
 
         # encoding_ids = nn.ZeroPad2d((0, 200 - encoding.input_ids.size()[1]))(encoding.input_ids)
         # generated_outputs = self.model.generate(encoding_ids, do_sample=False, output_scores=True,
         #                                    return_dict_in_generate=True)
-
-
-        generated_outputs = self.model.generate(encoding.input_ids, do_sample=True,num_beams=6, output_scores=True,
-                                           return_dict_in_generate=True)
-        while len(generated_outputs.scores) <= 4:
-            generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
-                                                    return_dict_in_generate=True)
+        model.train()
+        generated_outputs = self.model(input_ids=encoding.input_ids, labels=labels)
+        # generated_outputs = self.model(encoding.input_ids)
+        # generated_outputs = self.model.generate(encoding.input_ids, do_sample=True,num_beams=6, output_scores=True,
+        #                                    return_dict_in_generate=True)
+        # while len(generated_outputs.scores) <= 4:
+        #     generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
+        #                                             return_dict_in_generate=True)
 
         # Generate the logits for each token in the generated output sequence.
         # `scores` has size [batch, seq_length, vocab_size]
-        scores = torch.stack(generated_outputs.scores, dim=1)
+        # scores = torch.stack(generated_outputs.scores, dim=1)
 
         # transpose and expand to match the dimensions
-        score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
+        # score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
         # probabilities = score_of_labels.nanmean(dim=1).softmax(1)
+
+        score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
+
         probabilities = score_of_labels.softmax(2)
         # max_probability_index = torch.argmax(probabilities, dim=1)[0]
 
@@ -412,12 +447,13 @@ if __name__ == "__main__":
     other_arguments.add_argument("--train_batch_size", default=2, type=int)
     other_arguments.add_argument("--eval_batch_size", default=2, type=int)
     other_arguments.add_argument("--max_train_samples", default=-1, type=int)
-    other_arguments.add_argument("--num_train_epochs", default=4, type=int)
+    other_arguments.add_argument("--num_train_epochs", default=50, type=int)
     other_arguments.add_argument("--gradient_accumulation_steps", default=1, type=int)
     other_arguments.add_argument("--seed", default=42, type=int)
     other_arguments.add_argument("--save_top_k", default=-1, type=int)
     other_arguments.add_argument("--save_last", default=False, action="store_true")
     other_arguments.add_argument("--write_dev_predictions", default=False, action="store_true")
+    # other_arguments.add_argument('--learning_rate', type=float, default=0.03)
     other_arguments.add_argument('--learning_rate', type=float, default=3e-4)
 
     other_arguments.add_argument("--do_fast_dev_run", default=False, action="store_true")
@@ -490,7 +526,12 @@ if __name__ == "__main__":
     file.writelines("loss,accuracy,epoch,step")
     file.close()
 
-    trainer = Distilation_Trainer.DistilationTrainer(**train_params)
+    file1 = open("word_10747_student_probability.txt", "w")
+    file1.writelines("probability")
+    file1.close()
+
+    trainer = pl.Trainer(**train_params)
+    # trainer = Distilation_Trainer.DistilationTrainer(**train_params)
     # trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
