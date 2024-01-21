@@ -17,6 +17,7 @@ from datasets import load_dataset, concatenate_datasets
 import ast
 import Distilation_Trainer
 
+
 def compute_accuracy(student_distribution, labels):
     # predicted_label = logits.max(dim=1)[1]
     # predicted_label_tensor = student_distribution.max(dim=1)[1][0]
@@ -177,6 +178,8 @@ class ClassificationModelKD(pl.LightningModule):
         self.save_hyperparameters("model_arguments")
 
         self.loss_values_list = []
+
+        # self.first_weight = []
 
     def is_logger(self):
         return self.trainer.proc_rank <= 0
@@ -412,6 +415,14 @@ class ClassificationModelKD(pl.LightningModule):
         score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
 
         probabilities = score_of_labels.softmax(2)
+
+        # self.model.named_parameters()
+
+        # self.first_weight += [next(self.model.parameters()).data]
+        # if len(self.first_weight) > 1:
+        #     compare_tensor = self.first_weight[0] == self.first_weight[-1]
+        #     print(torch.all(compare_tensor))
+
         # max_probability_index = torch.argmax(probabilities, dim=1)[0]
 
         # entailment = labels[max_probability_index]
