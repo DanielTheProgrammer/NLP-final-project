@@ -15,55 +15,26 @@ from torchvision.datasets import MNIST
 from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model
 from datasets import load_dataset, concatenate_datasets
 import ast
-import Distilation_Trainer
 
 
 def compute_accuracy(student_distribution, labels):
-    # predicted_label = logits.max(dim=1)[1]
-    # predicted_label_tensor = student_distribution.max(dim=1)[1][0]
     max_predicted_probability, max_predicted_label = torch.max(student_distribution[0][0], dim=0)
-    # predicted_label_index = torch.zeros(1, )
-    # predicted_label_index[0] = predicted_label_tensor[0]
 
     teacher_distribution_tensor = create_y_tensor(labels)
-    # teacher_label_index = teacher_distribution_tensor.max(dim=1)[1]
     teacher_label_index = teacher_distribution_tensor.max(dim=1)[1][0]
 
-    # acc = (predicted_label == teacher_label)
-    # acc = (predicted_label_index == teacher_label_index)
     acc = (max_predicted_label == teacher_label_index)
     if acc:
-        accValue = 1
+        acc_value = 1
     else:
-        accValue = 0
+        acc_value = 0
 
     file = open("word_10747_student_probability.txt", "a")
-    file.write('%f' % student_distribution[0][0][10747])
+    file.write('%f' % student_distribution[0][0][7163])
     file.write('\n')
     file.close()
 
-    return accValue, max_predicted_label
-
-
-# def compute_accuracy(student_distribution, labels):
-#     # compute accuracy using the distance between the words' logits
-#     predicted_label_tensor = student_distribution.max(dim=1)[1][0]
-#     predicted_label_index = torch.zeros(1, )
-#     predicted_label_index[0] = predicted_label_tensor[0]
-#
-#     teacher_distribution_tensor = create_y_tensor(labels)
-#     teacher_label_index = teacher_distribution_tensor.max(dim=1)[1]
-#
-#     # find logits:
-#
-#     compute_loss
-#     # acc = (predicted_label == teacher_label)
-#     acc = (predicted_label_index == teacher_label_index)
-#     if acc[0]:
-#         accValue = 1
-#     else:
-#         accValue = 0
-#     return accValue, predicted_label_tensor
+    return acc_value, max_predicted_label
 
 def create_y_tensor(y):
     y_arr = ast.literal_eval(y)
@@ -75,70 +46,12 @@ def create_y_tensor(y):
 
 
 def compute_loss(student_distribution, y, T, alpha):
-    # calculate the T5 model probabilities over the input
-    # T5_probabilities = model.calculate_T5_probabilities(inputs)
-    # logits = student_distribution.logits
-
-    # filtered_student_distribution = student_distribution[0][0:3]
     filtered_student_distribution = student_distribution[0][0].reshape(1, -1)
     teacher_distribution = create_y_tensor(y)
 
-    # custom_loss = torch.nn.KLDivLoss()
     custom_loss = torch.nn.KLDivLoss()(F.log_softmax(filtered_student_distribution / T, dim=1),
                                        F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T)
-    # custom_loss.requires_grad = True
-    # custom_loss = torch.nn.KLDivLoss()(F.log_softmax(student_distribution / T, dim=1),
-    #                                    F.softmax(teacher_distribution / T, dim=1)) * (alpha * T * T) + \
-    #        F.nll_loss(student_distribution, teacher_distribution) * (1. - alpha)
-    # custom_loss = ...
     return custom_loss
-
-# class ClassificationModel(pl.LightningModule):
-#     def __init__(self, training_arguments, model_arguments, other_arguments):
-#         super(ClassificationModel, self).__init__()
-#
-#         self.training_arguments = training_arguments
-#         self.model_arguments = model_arguments
-#         self.other_arguments = other_arguments
-#
-#         self.dims = (1, 28, 28)
-#         channels, width, height = self.dims
-#         self.transform = transforms.Compose(
-#             [
-#                 transforms.ToTensor(),
-#                 transforms.Normalize((0.1307,), (0.3081,)),
-#             ]
-#         )
-#         self.model = nn.Sequential(
-#             nn.Flatten(),
-#             nn.Linear(channels * width * height, self.model_arguments.fc1_size),
-#             nn.ReLU(),
-#             nn.Dropout(0.1),
-#             nn.Linear(self.model_arguments.fc1_size, self.model_arguments.fc1_size),
-#             nn.ReLU(),
-#             nn.Dropout(0.1),
-#             nn.Linear(self.model_arguments.fc1_size, self.model_arguments.num_labels),
-#         )
-#
-#         self.optimizer = Adam
-#         self.save_hyperparameters("training_arguments")
-#         self.save_hyperparameters("model_arguments")
-#
-#     def is_logger(self):
-#         return self.trainer.proc_rank <= 0
-#
-#     def forward(self, x):
-#         x = self.model(x)
-#         # x = F.log_softmax(x, dim=1)
-#         return x
-#
-#     def _step(self, batch):
-#         x, y = batch
-#         outputs = self.model(x)
-#         logits = F.log_softmax(outputs, dim=1)
-#         softmax_logits = F.softmax(outputs, dim=1)
-#         loss = F.nll_loss(logits, y)
-#         return loss, softmax_logits
 
 
 class ClassificationModelKD(pl.LightningModule):
@@ -148,7 +61,6 @@ class ClassificationModelKD(pl.LightningModule):
         self.training_arguments = training_arguments
         self.model_arguments = model_arguments
         self.other_arguments = other_arguments
-        # self.teacher_model = teacher_model
 
         self.dims = (1, 28, 28)
         channels, width, height = self.dims
@@ -162,99 +74,39 @@ class ClassificationModelKD(pl.LightningModule):
         self.tokenizer = T5Tokenizer.from_pretrained("t5-small")
         self.model = T5ForConditionalGeneration.from_pretrained("t5-small")
 
-        # self.model = nn.Sequential(
-        #     nn.Flatten(),
-        #     nn.Linear(channels * width * height, self.model_arguments.fc1_size),
-        #     nn.ReLU(),
-        #     nn.Dropout(0.1),
-        #     nn.Linear(self.model_arguments.fc1_size, self.model_arguments.fc1_size),
-        #     nn.ReLU(),
-        #     nn.Dropout(0.1),
-        #     nn.Linear(self.model_arguments.fc1_size, self.model_arguments.num_labels),
-        # )
-
         self.optimizer = Adam
         self.save_hyperparameters("training_arguments")
         self.save_hyperparameters("model_arguments")
 
         self.loss_values_list = []
 
-        # self.first_weight = []
-
     def is_logger(self):
         return self.trainer.proc_rank <= 0
 
     def forward(self, x):
         x = self.model(x)
-        # x = F.log_softmax(x, dim=1)
         return x
 
     def _step(self, batch):
         x, y = batch
-        # with torch.no_grad():
-        #     output_teacher_batch = self.teacher_model(x)
-        # y = self.create_y_tensor(y)
 
         alpha = self.other_arguments.alpha_for_kd
         T = self.other_arguments.temperature_for_kd
 
-        # encoded_input = self.tokenizer(x, return_tensors='pt')
-
-        # input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-        # decoder_input_ids = self.tokenizer(y, return_tensors="pt").input_ids
-        # decoder_input_ids = self.model._shift_right(decoder_input_ids)
-        # add labels to the inputs, maybe decoder_output_ids
-
-        # input_ids = self.tokenizer.encode(x, return_tensors="pt")
-        # input_ids = input_ids.type(torch.LongTensor)
-        # input_ids = input_ids.to_sparse()
-        # labels = self.tokenizer.encode(y, return_tensors="pt")
-        # labels = y.type(torch.LongTensor)
-        # labels = labels.to_sparse()
-        # labels = y
-        #
-        # inputs = {
-        #     "input_ids": input_ids,
-        #     "decoder_input_ids": decoder_input_ids
-        #     # "labels": labels
-        # }
-        # the forward function automatically creates the correct decoder_input_ids
-
-        student_distribution = self.calculate_student_model_distribution(x)
+        student_distribution = self.calculate_student_model_distribution(x, y)
         loss = compute_loss(student_distribution, y, T, alpha)
 
-        # loss = self.model(**inputs).compute_loss()
-        # outputs = self.model(**inputs)
-        # logits = outputs.logits
-        # outputs = self.model(x)
-        # loss.item()
-        # logits = student_distribution
-
-        # outputs = model(**encoded_input)
-        # outputs = self.model(x)
-        # logits = F.log_softmax(outputs, dim=1)
-        # softmax_logits = F.softmax(logits, dim=1)
-        # labels_expanded = labels[:, :, None]
-
-        # output_teacher_batch = y
-        # loss = torch.nn.KLDivLoss()(F.softmax(logits / T, dim=1),
-        #                             F.softmax(labels_expanded / T, dim=1)) * (alpha * T * T) + \
-        #        F.nll_loss(logits, labels) * (1. - alpha)
-
-        # loss = torch.nn.KLDivLoss()(F.log_softmax(logits / T, dim=1),
-        #                             F.softmax(output_teacher_batch / T, dim=1)) * (alpha * T * T) + \
-        #        F.nll_loss(logits, y) * (1. - alpha)
         return loss, student_distribution
 
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        loss, logits = self._step(batch)
-        # logits = self.calculate_student_model_distribution(x)
-        acc, predicted_label = compute_accuracy(logits, y)
+        loss, student_distribution = self._step(batch)
+        acc, predicted_label = compute_accuracy(student_distribution, y)
         self.log('train_loss_inbal', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
 
+        # print probabilities
         self.loss_values_list += [loss, acc, self.trainer.current_epoch, self.trainer.global_step]
         parameters = [loss, acc, self.trainer.current_epoch, self.trainer.global_step]
 
@@ -265,26 +117,17 @@ class ClassificationModelKD(pl.LightningModule):
         file.close()
         return {"loss": loss, "acc": acc}
 
-    # def on_train_epoch_end(self, outputs):
-    #     avg_loss = torch.cat([x['loss'].view(-1) for x in outputs]).mean()
-    #     avg_acc = torch.cat([x['acc'].view(-1) for x in outputs]).mean()
-    #
-    #     print("--------------------")
-    #     print("Train avg_loss: ", avg_loss)
-    #     print("Train avg_acc: ", avg_acc)
-    #     print("--------------------")
-
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        loss, logits = self._step(batch)
-        logits = logits.squeeze(1)
-        acc, predicted_label = compute_accuracy(logits, y)
+        loss, student_distribution = self._step(batch)
+        student_distribution = student_distribution.squeeze(1)
+        acc, predicted_label = compute_accuracy(student_distribution, y)
         self.log('val_loss', loss, on_epoch=True)
         self.log('val_acc', acc, on_epoch=True)
         return {
             "val_loss": loss,
             "val_acc": acc,
-            "softmax_logits": logits.tolist(),
+            "softmax_logits": student_distribution.tolist(),
             "labels": y.tolist(),
             "predictions": predicted_label.tolist(),
         }
@@ -322,111 +165,43 @@ class ClassificationModelKD(pl.LightningModule):
         print("--------------------")
 
     def configure_optimizers(self):
-
         return self.optimizer(self.parameters(), lr=self.other_arguments.learning_rate)
 
-    # def prepare_data(self):
-        # download
-        # MNIST(self.other_arguments.data_dir, train=True, download=True)
-        # MNIST(self.other_arguments.data_dir, train=False, download=True)
-
     def setup(self, stage=None):
-
-        # if stage == "fit" or stage is None:
-        #     mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
-        #     number_of_train_samples = 55000
-        #
-        #     if(self.other_arguments.max_train_samples != -1):
-        #         number_of_train_samples = min(self.other_arguments.max_train_samples, 55000)
-        #     self.mnist_train = torch.utils.data.Subset(mnist_full, [i for i in range(number_of_train_samples)])
-        #     self.mnist_val = torch.utils.data.Subset(mnist_full, [i for i in range(55000, 60000)])
-        #
-        # if stage == "test" or stage is None:
-        #     self.mnist_test = MNIST(self.other_arguments.data_dir, train=False, transform=self.transform)
-
-        # mnist_full = MNIST(self.other_arguments.data_dir, train=True, transform=self.transform)
-        # dataset = load_dataset("csv", data_files="final_dataset.csv")
-
-        dataset = load_dataset("csv", data_files="final_dataset_1_example.csv")
-
-        # dataset = dataset.remove_columns("Unnamed: 0")
+        dataset = load_dataset("csv", data_files="final_dataset_2_example.csv")
 
         number_of_train_samples = len(dataset)
-        if (self.other_arguments.max_train_samples != -1):
+        if self.other_arguments.max_train_samples != -1:
             number_of_train_samples = min(self.other_arguments.max_train_samples, number_of_train_samples)
-        # self.mnist_train = torch.utils.data.Subset(dataset, [i for i in range(number_of_train_samples)])
-        # self.mnist_val = MNIST(self.other_arguments.data_dir, train=False, transform=self.transform)
 
     def train_dataloader(self):
-        # dataloader = DataLoader(
-        #     self.mnist_train,
-        #     self.other_arguments.train_batch_size,
-        #     drop_last=False, shuffle=True,
-        #     num_workers=self.training_arguments.num_workers)
-        # dataset = load_dataset("csv", data_files="final_dataset.csv")
-
-        dataset = load_dataset("csv", data_files="final_dataset_1_example.csv")
+        dataset = load_dataset("csv", data_files="final_dataset_2_example.csv")
 
         dataset = dataset["train"]
-        # dataset = dataset.remove_columns(["idx", "task"])
         dataloader = DataLoader(dataset, self.other_arguments.train_batch_size, drop_last=False,
                                     shuffle=True, num_workers=self.training_arguments.num_workers)
 
         return dataloader
 
-    # def val_dataloader(self):
-
-        # return DataLoader(self.mnist_val,
-        #                   batch_size=self.other_arguments.eval_batch_size,
-        #                   num_workers=self.training_arguments.num_workers)
-
-    def calculate_student_model_distribution(self, input):
+    def calculate_student_model_distribution(self, input, y):
         vocabulary = self.tokenizer.get_vocab()
         labels = list(vocabulary.keys())
         class_ids = torch.LongTensor(self.tokenizer(labels, padding="longest").input_ids)
 
-
-        # class_ids = nn.ZeroPad2d((0, 200 - class_ids.size()[1]))(class_ids)
-
+        teacher_distribution_tensor = create_y_tensor(y)
+        teacher_label_index = teacher_distribution_tensor.max(dim=1)[1][0]
+        word = labels[teacher_label_index]
 
         encoding = self.tokenizer(input, return_tensors="pt", return_length=True)
         labels = self.tokenizer(input, return_tensors="pt").input_ids
+        # labels = self.tokenizer(word, return_tensors="pt").input_ids
 
-        # encoding_ids = nn.ZeroPad2d((0, 200 - encoding.input_ids.size()[1]))(encoding.input_ids)
-        # generated_outputs = self.model.generate(encoding_ids, do_sample=False, output_scores=True,
-        #                                    return_dict_in_generate=True)
         model.train()
         generated_outputs = self.model(input_ids=encoding.input_ids, labels=labels)
-        # generated_outputs = self.model(encoding.input_ids)
-        # generated_outputs = self.model.generate(encoding.input_ids, do_sample=True,num_beams=6, output_scores=True,
-        #                                    return_dict_in_generate=True)
-        # while len(generated_outputs.scores) <= 4:
-        #     generated_outputs = self.model.generate(encoding.input_ids, do_sample=False, output_scores=True,
-        #                                             return_dict_in_generate=True)
-
-        # Generate the logits for each token in the generated output sequence.
-        # `scores` has size [batch, seq_length, vocab_size]
-        # scores = torch.stack(generated_outputs.scores, dim=1)
-
-        # transpose and expand to match the dimensions
-        # score_of_labels = scores.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
-        # probabilities = score_of_labels.nanmean(dim=1).softmax(1)
 
         score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
 
         probabilities = score_of_labels.softmax(2)
-
-        # self.model.named_parameters()
-
-        # self.first_weight += [next(self.model.parameters()).data]
-        # if len(self.first_weight) > 1:
-        #     compare_tensor = self.first_weight[0] == self.first_weight[-1]
-        #     print(torch.all(compare_tensor))
-
-        # max_probability_index = torch.argmax(probabilities, dim=1)[0]
-
-        # entailment = labels[max_probability_index]
-        # probability = probabilities[0, max_probability_index].item()
         return probabilities
 
 
@@ -512,15 +287,15 @@ if __name__ == "__main__":
     )
 
     train_params = dict(
-        accumulate_grad_batches=other_arguments.gradient_accumulation_steps,
+        # accumulate_grad_batches=other_arguments.gradient_accumulation_steps,
         # gpus=training_arguments.n_gpu,
-        deterministic=True,
+        # deterministic=True,
         max_epochs=other_arguments.num_train_epochs,
         precision=16 if training_arguments.fp_16 else 32,
         # amp_level=training_arguments.opt_level,
-        gradient_clip_val=training_arguments.max_grad_norm,
-        callbacks=[checkpoint_callback],
-        fast_dev_run=other_arguments.do_fast_dev_run,
+        # gradient_clip_val=training_arguments.max_grad_norm,
+        # callbacks=[checkpoint_callback],
+        # fast_dev_run=other_arguments.do_fast_dev_run,
     )
 
     if (other_arguments.limit_train_batches != -1):
@@ -532,7 +307,6 @@ if __name__ == "__main__":
     if (training_arguments.distributed_backend != None):
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
-    # dataLoader = model.train_dataloader()
     file = open("loss_values.txt", "w")
     file.writelines("loss,accuracy,epoch,step")
     file.close()
@@ -542,18 +316,6 @@ if __name__ == "__main__":
     file1.close()
 
     trainer = pl.Trainer(**train_params)
-    # trainer = Distilation_Trainer.DistilationTrainer(**train_params)
-    # trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
-    # values_list = model.loss_values_list
-    # # open file
-    # with open('loss_values.txt', 'w+') as f:
-    #     # write elements of list
-    #     for items in values_list:
-    #         for value in items:
-    #             f.write('%s,' % value)
-    #         f.write('\n')
-    #     print("File written successfully")
-    # f.close()
 
