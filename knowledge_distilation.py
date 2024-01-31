@@ -188,9 +188,9 @@ class ClassificationModelKD(pl.LightningModule):
         labels = list(vocabulary.keys())
         class_ids = torch.LongTensor(self.tokenizer(labels, padding="longest").input_ids)
 
-        teacher_distribution_tensor = create_y_tensor(y)
-        teacher_label_index = teacher_distribution_tensor.max(dim=1)[1][0]
-        word = labels[teacher_label_index]
+        # teacher_distribution_tensor = create_y_tensor(y)
+        # teacher_label_index = teacher_distribution_tensor.max(dim=1)[1][0]
+        # word = labels[teacher_label_index]
 
         encoding = self.tokenizer(input, return_tensors="pt", return_length=True)
         labels = self.tokenizer(input, return_tensors="pt").input_ids
@@ -198,6 +198,7 @@ class ClassificationModelKD(pl.LightningModule):
 
         model.train()
         generated_outputs = self.model(input_ids=encoding.input_ids, labels=labels)
+        # generated_outputs = self.model(input)
 
         score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
 
