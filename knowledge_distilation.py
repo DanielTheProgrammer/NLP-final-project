@@ -1,20 +1,20 @@
 import torch
-import pytorch_lightning as pl
 from torch.nn import functional as F
 import pandas as pd
 import argparse
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 from torch.optim.optimizer import Optimizer
-from pytorch_lightning import LightningModule, Trainer
 from torch import nn
 from torchmetrics import Accuracy
 from torchvision import transforms
 from torchvision.datasets import MNIST
-from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model
+from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model, Seq2SeqTrainingArguments
 from datasets import load_dataset, concatenate_datasets
 import ast
+from transformers import Seq2SeqTrainer
+import transformers
 
 
 def compute_accuracy(student_distribution, labels):
@@ -54,16 +54,26 @@ def compute_loss(student_distribution, y, T, alpha):
     return custom_loss
 
 
-class ClassificationModelKD(pl.LightningModule):
-    def __init__(self, training_arguments, model_arguments, other_arguments):
-        super(ClassificationModelKD, self).__init__()
+def train_dataloader(other_arguments):
+    dataset = load_dataset("csv", data_files="final_dataset_2_example.csv", split="train")
+    # number_of_train_samples = len(dataset)
+    # if other_arguments.max_train_samples != -1:
+    #     number_of_train_samples = min(other_arguments.max_train_samples, number_of_train_samples)
+    return dataset
+
+
+# class ClassificationModelKD(pl.LightningModule):
+class ClassificationModelKD(Seq2SeqTrainer):
+    def __init__(self, training_arguments, model_arguments, other_arguments, args, model_argument,
+                        data_loader):
+        super(ClassificationModelKD, self).__init__(model_argument, args=args, train_dataset=data_loader)
 
         self.training_arguments = training_arguments
         self.model_arguments = model_arguments
         self.other_arguments = other_arguments
 
-        self.dims = (1, 28, 28)
-        channels, width, height = self.dims
+        # self.dims = (1, 28, 28)
+        # channels, width, height = self.dims
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -74,18 +84,18 @@ class ClassificationModelKD(pl.LightningModule):
         self.tokenizer = T5Tokenizer.from_pretrained("t5-small")
         self.model = T5ForConditionalGeneration.from_pretrained("t5-small")
 
-        self.optimizer = Adam
-        self.save_hyperparameters("training_arguments")
-        self.save_hyperparameters("model_arguments")
+        # self.optimizer = AdamW
+        # self.save_hyperparameters("training_arguments")
+        # self.save_hyperparameters("model_arguments")
 
         self.loss_values_list = []
 
     def is_logger(self):
         return self.trainer.proc_rank <= 0
 
-    def forward(self, x):
-        x = self.model(x)
-        return x
+    # def forward(self, x):
+    #     x = self.model(x)
+    #     return x
 
     def _step(self, batch):
         x, y = batch
@@ -102,6 +112,7 @@ class ClassificationModelKD(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         loss, student_distribution = self._step(batch)
+        loss = loss * 100
         acc, predicted_label = compute_accuracy(student_distribution, y)
         self.log('train_loss_inbal', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
@@ -176,11 +187,9 @@ class ClassificationModelKD(pl.LightningModule):
 
     def train_dataloader(self):
         dataset = load_dataset("csv", data_files="final_dataset_2_example.csv")
-
         dataset = dataset["train"]
         dataloader = DataLoader(dataset, self.other_arguments.train_batch_size, drop_last=False,
                                     shuffle=True, num_workers=self.training_arguments.num_workers)
-
         return dataloader
 
     def calculate_student_model_distribution(self, input, y):
@@ -198,6 +207,12 @@ class ClassificationModelKD(pl.LightningModule):
 
         model.train()
         generated_outputs = self.model(input_ids=encoding.input_ids, labels=labels)
+
+        #print weights:
+        # for param in self.model.parameters():
+        #     print(param.size)
+        #     print(param.data)
+
         # generated_outputs = self.model(input)
 
         score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
@@ -270,22 +285,66 @@ if __name__ == "__main__":
     print("Other arguments", other_arguments)
     print("--------------------")
 
-    pl.seed_everything(other_arguments.seed)
+    transformers.set_seed(other_arguments.seed)
+
+    train_dataset = train_dataloader(training_arguments)
 
     # teacher_model = ClassificationModel.load_from_checkpoint(checkpoint_path=other_arguments.teacher_model,
     #                                                          other_arguments=None)
+
+    output_dir = "C:/NLP-final-project/Output"
+    logging_dir = "C:/NLP-final-project/Logs"
+
+
+    T5_model = T5ForConditionalGeneration.from_pretrained("t5-small")
+    Seq2Seq_args = Seq2SeqTrainingArguments(
+        output_dir,
+        remove_unused_columns=False,
+        # full_determinism=False
+        # evaluation_strategy = 'steps',
+        # eval_steps=args.eval_steps,
+        # save_strategy='no',
+        # save_steps=args.eval_steps,
+        # logging_dir=logging_dir,
+        # logging_strategy=logging_strategy,
+        # logging_steps=args.eval_steps,
+        # max_steps=args.max_steps,
+        # learning_rate=args.lr,
+        # gradient_accumulation_steps=args.grad_steps,
+        # per_device_train_batch_size=args.ba
+    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--remove_unused_columns', type=bool, default=False)
+    parser.add_argument('--full_determinism', type=bool, default=False)
+    parser.add_argument('--seed', type=int, default=other_arguments.seed)
+    parser.add_argument('--skip_memory_metrics', type=bool, default=False)
+
+    args = parser.parse_args()
+
+    # T5_model.parallelize()
     model = ClassificationModelKD(training_arguments=training_arguments,
                                 model_arguments=model_arguments,
-                                other_arguments=other_arguments)
+                                other_arguments=other_arguments,
+                                model_argument=T5_model,
+                                args=Seq2Seq_args,
+                                data_loader=train_dataset)
                                 # teacher_model=teacher_model)
 
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        dirpath=other_arguments.output_dir,
-        monitor="val_acc",
-        save_top_k=other_arguments.save_top_k,
-        save_last=other_arguments.save_last,
-        mode='max'
-    )
+    # checkpoint_callback = Seq2SeqTrainer.callbacks.ModelCheckpoint(
+    #     dirpath=other_arguments.output_dir,
+    #     monitor="val_acc",
+    #     save_top_k=other_arguments.save_top_k,
+    #     save_last=other_arguments.save_last,
+    #     mode='max'
+    # )
+
+    # checkpoint_callback = transformers.TrainerCallback (
+    #     dirpath=other_arguments.output_dir,
+    #     monitor="val_acc",
+    #     save_top_k=other_arguments.save_top_k,
+    #     save_last=other_arguments.save_last,
+    #     mode='max'
+    # )
 
     train_params = dict(
         # accumulate_grad_batches=other_arguments.gradient_accumulation_steps,
@@ -308,15 +367,15 @@ if __name__ == "__main__":
     if (training_arguments.distributed_backend != None):
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
-    file = open("loss_values.txt", "w")
-    file.writelines("loss,accuracy,epoch,step")
-    file.close()
+    # file = open("loss_values.txt", "w")
+    # file.writelines("loss,accuracy,epoch,step")
+    # file.close()
+    #
+    # file1 = open("word_10747_student_probability.txt", "w")
+    # file1.writelines("probability")
+    # file1.close()
 
-    file1 = open("word_10747_student_probability.txt", "w")
-    file1.writelines("probability")
-    file1.close()
+    # trainer = pl.Trainer(**train_params)
+    # trainer.fit(model)
 
-    trainer = pl.Trainer(**train_params)
-    trainer.fit(model)
-
-
+    model.train()
