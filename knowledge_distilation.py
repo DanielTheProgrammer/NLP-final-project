@@ -10,7 +10,8 @@ from torch import nn
 from torchmetrics import Accuracy
 from torchvision import transforms
 from torchvision.datasets import MNIST
-from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model, Seq2SeqTrainingArguments
+from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model, Seq2SeqTrainingArguments, \
+    AutoTokenizer
 from datasets import load_dataset, concatenate_datasets
 import ast
 from transformers import Seq2SeqTrainer
@@ -56,10 +57,11 @@ def compute_loss(student_distribution, y, T, alpha):
 
 def train_dataloader(other_arguments):
     dataset = load_dataset("csv", data_files="final_dataset_2_example.csv", split="train")
+    # dataset = load_dataset("csv", data_files="final_dataset_2_example.csv")
     # number_of_train_samples = len(dataset)
     # if other_arguments.max_train_samples != -1:
     #     number_of_train_samples = min(other_arguments.max_train_samples, number_of_train_samples)
-    return dataset
+    return dataset.with_format("torch")
 
 
 # class ClassificationModelKD(pl.LightningModule):
@@ -110,8 +112,12 @@ class ClassificationModelKD(Seq2SeqTrainer):
 
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
-        loss, student_distribution = self._step(batch)
+        x, y = batch_idx
+        if x == "input":
+            return torch.tensor(0)
+            # return {"loss": torch.tensor(0), "acc": 0}
+
+        loss, student_distribution = self._step(batch_idx)
         loss = loss * 100
         acc, predicted_label = compute_accuracy(student_distribution, y)
         self.log('train_loss_inbal', loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=1)
@@ -205,7 +211,7 @@ class ClassificationModelKD(Seq2SeqTrainer):
         labels = self.tokenizer(input, return_tensors="pt").input_ids
         # labels = self.tokenizer(word, return_tensors="pt").input_ids
 
-        model.train()
+        # model.train()
         generated_outputs = self.model(input_ids=encoding.input_ids, labels=labels)
 
         #print weights:
@@ -215,9 +221,10 @@ class ClassificationModelKD(Seq2SeqTrainer):
 
         # generated_outputs = self.model(input)
 
-        score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
+        # score_of_labels = generated_outputs.logits.gather(dim=2, index=class_ids.T.expand(1, -1, -1))
+        # probabilities = score_of_labels.softmax(2)
 
-        probabilities = score_of_labels.softmax(2)
+        probabilities = generated_outputs.logits.softmax(2)
         return probabilities
 
 
@@ -287,7 +294,14 @@ if __name__ == "__main__":
 
     transformers.set_seed(other_arguments.seed)
 
+    tokenizer = AutoTokenizer.from_pretrained("t5-small")
+
     train_dataset = train_dataloader(training_arguments)
+    train_dataset = train_dataset.map(lambda x:
+                                            {'input': tokenizer.convert_tokens_to_ids(x['input']),
+                                             'label': tokenizer.convert_tokens_to_ids(x['label'])})
+
+    train_dataset.with_format("torch")
 
     # teacher_model = ClassificationModel.load_from_checkpoint(checkpoint_path=other_arguments.teacher_model,
     #                                                          other_arguments=None)
