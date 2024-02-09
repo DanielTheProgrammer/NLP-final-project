@@ -16,7 +16,7 @@ from datasets import load_dataset, concatenate_datasets
 import ast
 from transformers import Seq2SeqTrainer
 import transformers
-
+# from torch import Module, Tensor
 
 def compute_accuracy(student_distribution, labels):
     max_predicted_probability, max_predicted_label = torch.max(student_distribution[0][0], dim=0)
@@ -73,6 +73,7 @@ class ClassificationModelKD(Seq2SeqTrainer):
         self.training_arguments = training_arguments
         self.model_arguments = model_arguments
         self.other_arguments = other_arguments
+        self.training_dataset = data_loader
 
         # self.dims = (1, 28, 28)
         # channels, width, height = self.dims
@@ -112,10 +113,8 @@ class ClassificationModelKD(Seq2SeqTrainer):
 
 
     def training_step(self, batch, batch_idx):
-        return torch.tensor(0)
-
         x, y = batch_idx
-        if x == "input":
+        if x == "input_ids":
             return torch.tensor(0)
             # return {"loss": torch.tensor(0), "acc": 0}
 
@@ -302,9 +301,9 @@ if __name__ == "__main__":
     # train_dataset = train_dataset.map(lambda x:
     #                                         {'input': x['input']})
     train_dataset = train_dataset.map(lambda x:
-                                            {'input': x['input'],
-                                             'label': tokenizer.convert_tokens_to_ids(x['label'])})
-
+                                            {'input_ids': tokenizer.convert_tokens_to_ids(x['input_ids']),
+                                             'labels': create_y_tensor(x['labels'])})
+    # train_dataset = train_dataset[0]
     train_dataset.with_format("torch")
 
     # teacher_model = ClassificationModel.load_from_checkpoint(checkpoint_path=other_arguments.teacher_model,
@@ -318,6 +317,7 @@ if __name__ == "__main__":
     Seq2Seq_args = Seq2SeqTrainingArguments(
         output_dir,
         remove_unused_columns=False,
+        label_smoothing_factor=1
         # full_determinism=False
         # evaluation_strategy = 'steps',
         # eval_steps=args.eval_steps,
