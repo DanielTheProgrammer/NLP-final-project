@@ -112,6 +112,8 @@ class ClassificationModelKD(Seq2SeqTrainer):
 
 
     def training_step(self, batch, batch_idx):
+        return torch.tensor(0)
+
         x, y = batch_idx
         if x == "input":
             return torch.tensor(0)
@@ -297,8 +299,10 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained("t5-small")
 
     train_dataset = train_dataloader(training_arguments)
+    # train_dataset = train_dataset.map(lambda x:
+    #                                         {'input': x['input']})
     train_dataset = train_dataset.map(lambda x:
-                                            {'input': tokenizer.convert_tokens_to_ids(x['input']),
+                                            {'input': x['input'],
                                              'label': tokenizer.convert_tokens_to_ids(x['label'])})
 
     train_dataset.with_format("torch")
