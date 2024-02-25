@@ -1,20 +1,8 @@
-import torch
 import pytorch_lightning as pl
-from torch.nn import functional as F
-import pandas as pd
 import argparse
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-from torch.optim import Adam
-from torch.optim.optimizer import Optimizer
-from pytorch_lightning import LightningModule, Trainer
-from torch import nn
-from torchmetrics import Accuracy
-from torchvision import transforms
-from torchvision.datasets import MNIST
-from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5Model
-from datasets import load_dataset, concatenate_datasets
-import ast
+from torch.utils.data import DataLoader
+from transformers import T5ForConditionalGeneration
+from datasets import load_dataset
 import knowledge_distilation
 
 
@@ -57,34 +45,11 @@ def run():
     if training_arguments.distributed_backend != None:
         train_params["distributed_backend"] = training_arguments.distributed_backend
 
-    # file = open("loss_values.txt", "w")
-    # file.writelines("loss,accuracy,epoch,step")
-    # file.close()
-    #
-    # file1 = open("word_10747_student_probability.txt", "w")
-    # file1.writelines("probability")
-    # file1.close()
-
     trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
-    # generate_student_model(student_model, dataloader)
-
-
-# def generate_student_model(model, dataloader):
-#     file = open("student_model_generated.txt", "a")
-#     file.writelines("input,label,model_response_1,model_response_2,model_response_3")
-#     # get inputs from dataloader
-#     for x in inputs:
-#         results = model.generate(x)
-#         for i in range(3):
-#             file.write('%s,' % parameter)
-#     file.write('\n')
-#     file.close()
-
-
 def create_dataloader():
-    dataset = load_dataset("csv", data_files="final_dataset_2_example.csv")
+    dataset = load_dataset("csv", data_files="final_dataset.csv")
     dataset = dataset["train"]
     dataloader = DataLoader(dataset, other_arguments.train_batch_size, drop_last=False,
                             shuffle=True, num_workers=training_arguments.num_workers)

@@ -119,13 +119,9 @@ class ClassificationModelKD(pl.LightningModule):
                       true_probability_of_label]
 
         file = open("model_run_parameters.txt", "a")
-        # file.writelines("epoch,step,loss,accuracy,student_probability_for_true_label,true_probability_of_label")
         line = str(self.trainer.global_step) + "," + str(self.trainer.current_epoch) + "," + str('%.8f' % loss.item()) + "," + \
                 str('%.8f' % acc) + "," + str('%.8f' % student_probability_of_label.item()) + "," + str('%.8f' % true_probability_of_label.item()) + '\n'
         file.write(line)
-        # for parameter in parameters:
-        #     file.write('%s,' % parameter)
-        # file.write('\n')
         file.close()
         return {"loss": loss, "acc": acc}
 
@@ -179,13 +175,6 @@ class ClassificationModelKD(pl.LightningModule):
     def configure_optimizers(self):
         return self.optimizer(self.parameters(), lr=self.other_arguments.learning_rate)
 
-    # def setup(self, stage=None):
-    #     dataset = load_dataset("csv", data_files="final_dataset_2_example.csv")
-    #
-    #     number_of_train_samples = len(dataset)
-    #     if self.other_arguments.max_train_samples != -1:
-    #         number_of_train_samples = min(self.other_arguments.max_train_samples, number_of_train_samples)
-
     def train_dataloader(self):
         return self.dataloader
 
@@ -229,147 +218,4 @@ class ClassificationModelKD(pl.LightningModule):
         file.close()
 
         super(ClassificationModelKD, self).on_train_epoch_end()
-
-
-    # def on_train_epoch_end(self):
-    #     with open("student_model_generated.txt", "a") as file:
-    #         for x, label in self.dataloader:
-    #             # Prepare input for the model
-    #             input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-    #
-    #             # Generate output
-    #             generated_outputs = self.model.generate(
-    #                 input_ids,
-    #                 num_return_sequences=3,
-    #                 output_scores=True,
-    #                 return_dict_in_generate=True
-    #             )
-    #
-    #             # Decode the generated outputs
-    #             decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in generated_outputs.sequences]
-    #
-    #             # Write epoch and input to the file
-    #             file.write(f'{self.trainer.current_epoch},{x}')
-    #
-    #             # Write each of the generated sequences
-    #             for output in decoded_outputs:
-    #                 file.write(f',{output}')
-    #             file.write('\n')
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#
-#     # Training arguments
-#     training_arguments = parser.add_argument_group('training_arguments')
-#     training_arguments.add_argument("--opt_level", default="O1")
-#     training_arguments.add_argument('--max_grad_norm', type=float, default=1.0)
-#     training_arguments.add_argument("--fp_16", default=False, action="store_true")
-#     training_arguments.add_argument("--n_gpu", default=-1, type=int)
-#     training_arguments.add_argument("--num_workers", default=8, type=int)
-#     training_arguments.add_argument("--distributed_backend", default=None)
-#
-#     # Model arguments
-#     model_arguments = parser.add_argument_group('model_arguments')
-#     model_arguments.add_argument("--num_labels", type=int)
-#     model_arguments.add_argument("--fc1_size", type=int)
-#
-#     # Other arguments
-#     other_arguments = parser.add_argument_group('other_arguments')
-#     other_arguments.add_argument("--output_dir", default="./")
-#     other_arguments.add_argument("--teacher_model", default="./")
-#     other_arguments.add_argument("--alpha_for_kd", default=0.9, type=float)
-#     other_arguments.add_argument("--temperature_for_kd", default=20, type=int)
-#     other_arguments.add_argument("--predictions_file", default="predictions.csv")
-#     other_arguments.add_argument("--data_dir", default="./")
-#     other_arguments.add_argument("--train_batch_size", default=2, type=int)
-#     other_arguments.add_argument("--eval_batch_size", default=2, type=int)
-#     other_arguments.add_argument("--max_train_samples", default=-1, type=int)
-#     other_arguments.add_argument("--num_train_epochs", default=50, type=int)
-#     other_arguments.add_argument("--gradient_accumulation_steps", default=1, type=int)
-#     other_arguments.add_argument("--seed", default=42, type=int)
-#     other_arguments.add_argument("--save_top_k", default=-1, type=int)
-#     other_arguments.add_argument("--save_last", default=False, action="store_true")
-#     other_arguments.add_argument("--write_dev_predictions", default=False, action="store_true")
-#     # other_arguments.add_argument('--learning_rate', type=float, default=0.03)
-#     other_arguments.add_argument('--learning_rate', type=float, default=3e-4)
-#
-#     other_arguments.add_argument("--do_fast_dev_run", default=False, action="store_true")
-#     other_arguments.add_argument("--limit_train_batches", default=-1, type=int)
-#     other_arguments.add_argument("--limit_val_batches", default=-1, type=int)
-#
-#     '''
-#     args = parser.parse_args(
-#     " --model_name_or_path roberta-base  --max_input_seq_length 100   --TRAIN_FILE sst2_train.csv --output_dir ./ --DEV_FILE sst2_dev.csv --train_batch_size 32 --eval_batch_size 32 --max_train_samples 10000 --num_train_epochs 5 --gradient_accumulation_steps 1 --save_top_k 0 --learning_rate 5e-6 --write_dev_predictions".split()
-#     )
-#     '''
-#     args = parser.parse_args()
-#
-#     for group in parser._action_groups:
-#         group_dict = {a.dest: getattr(args, a.dest, None) for a in group._group_actions}
-#         if (group.title == "training_arguments"):
-#             training_arguments = argparse.Namespace(**group_dict)
-#         elif (group.title == "model_arguments"):
-#             model_arguments = argparse.Namespace(**group_dict)
-#         elif (group.title == "other_arguments"):
-#             other_arguments = argparse.Namespace(**group_dict)
-#
-#     print("Training arguments", training_arguments)
-#     print("--------------------")
-#     print("Model arguments", model_arguments)
-#     print("--------------------")
-#     print("Other arguments", other_arguments)
-#     print("--------------------")
-#
-#     pl.seed_everything(other_arguments.seed)
-#
-#     student_model = T5ForConditionalGeneration.from_pretrained("t5-small")
-#
-#     # teacher_model = ClassificationModel.load_from_checkpoint(checkpoint_path=other_arguments.teacher_model,
-#     #                                                          other_arguments=None)
-#     model = ClassificationModelKD(training_arguments=training_arguments,
-#                                 model_arguments=model_arguments,
-#                                 other_arguments=other_arguments,
-#                                 student_model=student_model)
-#
-#     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-#         dirpath=other_arguments.output_dir,
-#         monitor="val_acc",
-#         save_top_k=other_arguments.save_top_k,
-#         save_last=other_arguments.save_last,
-#         mode='max'
-#     )
-#
-#     train_params = dict(
-#         # accumulate_grad_batches=other_arguments.gradient_accumulation_steps,
-#         # gpus=training_arguments.n_gpu,
-#         # deterministic=True,
-#         max_epochs=other_arguments.num_train_epochs,
-#         precision=16 if training_arguments.fp_16 else 32,
-#         # amp_level=training_arguments.opt_level,
-#         # gradient_clip_val=training_arguments.max_grad_norm,
-#         # callbacks=[checkpoint_callback],
-#         # fast_dev_run=other_arguments.do_fast_dev_run,
-#     )
-#
-#     if (other_arguments.limit_train_batches != -1):
-#         train_params["limit_train_batches"] = other_arguments.limit_train_batches
-#
-#     if (other_arguments.limit_val_batches != -1):
-#         train_params["limit_val_batches"] = other_arguments.limit_val_batches
-#
-#     if (training_arguments.distributed_backend != None):
-#         train_params["distributed_backend"] = training_arguments.distributed_backend
-#
-#     file = open("loss_values.txt", "w")
-#     file.writelines("loss,accuracy,epoch,step")
-#     file.close()
-#
-#     file1 = open("word_10747_student_probability.txt", "w")
-#     file1.writelines("probability")
-#     file1.close()
-#
-#     trainer = pl.Trainer(**train_params)
-#     trainer.fit(model)
-
 
