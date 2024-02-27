@@ -47,6 +47,9 @@ class ClassificationModelKD(pl.LightningModule):
 
         file = open("model_run_parameters.txt", "w")
         file.writelines("epoch,step,loss,accuracy,student_probability_for_true_label,true_probability_of_label\n")
+
+        file = open("student_model_generated.txt", "w")
+        file.writelines("epoch,input,output_1,output_2,output_3\n")
         file.close()
 
     def is_logger(self):
@@ -86,7 +89,7 @@ class ClassificationModelKD(pl.LightningModule):
         #               true_probability_of_label]
 
         file = open("model_run_parameters.txt", "a")
-        for i in range(self.other_arguments.train_batch_size):
+        for i in range(len(x)):
             line = str(self.trainer.current_epoch) + "," + str(self.trainer.global_step) + "," + \
                    str('%.8f' % loss.item()) + "," + str('%.8f' % acc) + "," + \
                    str('%.8f' % student_probability_of_label[i].item()) + "," + \
@@ -153,10 +156,11 @@ class ClassificationModelKD(pl.LightningModule):
         vocabulary_list = list(vocabulary.keys())
         class_ids = torch.LongTensor(self.tokenizer(vocabulary_list, padding="longest").input_ids)
 
-        encoding = self.tokenizer(inputs[0], padding=True, truncation=True, return_tensors="pt", return_length=True)
-        input_labels = [inputs[0][i] + self.get_correct_label(y_tensor[i]) for i in range(self.other_arguments.train_batch_size)]
-        input_labels = [tuple(input_labels)]
-        labels = self.tokenizer(input_labels[0], padding=True, truncation=True, return_tensors="pt")
+        batch_size = len(y_tensor)  # in case the batch size is larger than the remaining items on the list
+        encoding = self.tokenizer(inputs, padding=True, truncation=True, return_tensors="pt", return_length=True)
+        input_labels = [inputs[i] + self.get_correct_label(y_tensor[i]) for i in range(batch_size)]
+        # input_labels = [tuple(input_labels)]
+        labels = self.tokenizer(input_labels, padding=True, truncation=True, return_tensors="pt", return_length=True)
 
         generated_outputs = self.model(input_ids=encoding.input_ids, labels=labels.input_ids)
 
@@ -173,7 +177,7 @@ class ClassificationModelKD(pl.LightningModule):
 
     def compute_accuracy(self, student_distribution, teacher_distribution):
         acc_value = 0
-        batch_size = self.other_arguments.train_batch_size
+        batch_size = len(teacher_distribution)
         max_predicted_labels = torch.zeros(batch_size)
         student_distribution_for_max_label = torch.zeros(batch_size)
         teacher_distribution_for_max_label = torch.zeros(batch_size)
@@ -196,12 +200,20 @@ class ClassificationModelKD(pl.LightningModule):
 
     def create_y_tensor(self, y):
         # y_arr = ast.literal_eval(y)
-        batch_size = self.other_arguments.train_batch_size
+        # y is a list of size 2, the first item is the indices of the label and the second is the probabilities
+        # each item is a list of size 5,
+        # batch_size = self.other_arguments.train_batch_size
+        batch_size = len(y[0])
         y_tensor = torch.zeros(batch_size, 32128)
-        for indices, probs in y:
-            for i in range(batch_size):
-                idx = int(indices[i].item())
-                y_tensor[i][idx] = probs[i].item()
+
+        for i in range(batch_size):
+            for j in range(len(y[0][i])):
+                y_tensor[i][y[0][i][j]] = y[1][i][j]
+
+        # for indices, probs in y:
+        #     for i in range(batch_size):
+        #         idx = int(indices[i].item())
+        #         y_tensor[i][idx] = probs[i].item()
         return y_tensor
 
     def compute_loss(self, student_distribution, teacher_distribution, T, alpha):
@@ -215,18 +227,21 @@ class ClassificationModelKD(pl.LightningModule):
     def on_train_epoch_end(self):
         file = open("student_model_generated.txt", "a", encoding="utf-8")
         for x, label in self.dataloader:
-            input_ids = self.tokenizer(x, return_tensors="pt").input_ids
-            generated_output = self.model.generate(input_ids, num_return_sequences=3, output_scores=True,
-                                                   return_dict_in_generate=True, num_beams=3)
-            generated_sequences = generated_output.sequences
-            decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in generated_sequences]
+            for i in range(len(x)):
+                input_str = x[i]
+                input_ids = self.tokenizer(input_str, return_tensors="pt").input_ids
+                generated_output = self.model.generate(input_ids, num_return_sequences=3, output_scores=True,
+                                                       return_dict_in_generate=True, num_beams=3)
+                generated_sequences = generated_output.sequences
+                decoded_outputs = [self.tokenizer.decode(output, skip_special_tokens=True) for output in generated_sequences]
 
-            line = str(self.trainer.current_epoch) + "," + x + ","
-            file.write(line)
+                line = str(self.trainer.current_epoch) + "," + input_str
+                file.write(line)
 
-            for output in decoded_outputs:
-                file.write(f',{output}')
-            file.write('\n')
+                for output in decoded_outputs:
+                    file.write(f',{output}')
+                file.write('\n')
+            break
         file.close()
 
         super(ClassificationModelKD, self).on_train_epoch_end()

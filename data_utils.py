@@ -17,7 +17,7 @@ def get_sentiment_task_results(sentiment_task, text):
     result = sentiment_task(text, return_all_scores=True)
     # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
     words_arr = [(result[0][0]['label'], result[0][0]['score']), (result[0][1]['label'], result[0][1]['score']),
-                 (result[0][2]['label'], result[0][2]['score'])]
+                 (result[0][2]['label'], result[0][2]['score']), ('True', 0.0), ('False', 0.0)]
     tensor = create_word_prob_encoding(words_arr)
     x = 1
     return tensor
@@ -28,7 +28,9 @@ def create_csv_data_sentiment_model():
     sentiment_task = pipeline("sentiment-analysis", model=MODEL, tokenizer=MODEL)
     dataset = load_dataset("parquet", data_files='tweet_sentiment_multilingual-train.parquet')
     dataset = dataset["train"]
+
     # dataset = dataset.select([0, 10])
+
     dataset_base = dataset.map(lambda dict: {"text": "what sentiment the following sentence has: " + dict["text"],
                                                  "label": get_sentiment_task_results(sentiment_task, dict["text"]),
                                                  "task": "sentiment"})
@@ -47,7 +49,8 @@ def create_csv_data_sentiment_model():
 def get_yesno_task_results(yesno_task, text):
     result = yesno_task(text, return_all_scores=True)
     # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
-    words_arr = [(result[0][0]['label'], result[0][0]['score']), (result[0][1]['label'], result[0][1]['score'])]
+    words_arr = [(result[0][0]['label'], result[0][0]['score']), (result[0][1]['label'], result[0][1]['score']),
+                 ('negative', 0.0), ('neutral', 0.0), ('positive', 0.0)]
     tensor = create_word_prob_encoding(words_arr)
     return tensor
 
@@ -60,7 +63,9 @@ def create_csv_data_yesno_model(starting_idx):
     #dataset = load_dataset("parquet", data_files='tweet_sentiment_multilingual-train.parquet')
     dataset = dataset["train"]
     dataset = dataset.remove_columns(["passage"])
+
     # dataset = dataset.select([0, 10])
+
     dataset = dataset.map(lambda dict: {"question": "Answer yes or no: " + dict["question"],
                                                  "answer": get_yesno_task_results(yesno_task, dict["question"]),
                                                  "task": "yesno"})
@@ -99,7 +104,7 @@ def merge_datasets(dataset1_filename, dataset2_filename):
 def find_index_of_word_in_vocabulary(word):
     tokenizer = T5Tokenizer.from_pretrained("t5-small")
     # model = T5ForConditionalGeneration.from_pretrained("t5-small")
-    token_ids = tokenizer.encode(word, add_special_tokens=False)
+    token_ids = tokenizer.encode(word, add_special_tokens=False)[0]
     return token_ids
     # tokenized_word = tokenizer.tokenize(word)
     # word_index = 0
@@ -126,7 +131,8 @@ def create_word_prob_encoding(words_arr):
     return words_tensor_arr
 
 
-curr_idx = create_csv_data_sentiment_model()
-create_csv_data_yesno_model(curr_idx)
-merge_datasets("sentiment_dataset.csv", "yesno_dataset.csv")
-# print("here")
+if __name__ == "__main__":
+    curr_idx = create_csv_data_sentiment_model()
+    create_csv_data_yesno_model(curr_idx)
+    merge_datasets("sentiment_dataset.csv", "yesno_dataset.csv")
+    # print("here")
