@@ -13,7 +13,6 @@ from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Model, TFT5M
 
 # Preparing first model - twitter-roberta-base-sentiment-latest:
 
-
 def get_sentiment_task_results(sentiment_task, text):
     result = sentiment_task(text, return_all_scores=True)
     # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
@@ -22,6 +21,7 @@ def get_sentiment_task_results(sentiment_task, text):
     tensor = create_word_prob_encoding(words_arr)
     x = 1
     return tensor
+
 
 def create_csv_data_sentiment_model():
     MODEL = f"cardiffnlp/twitter-roberta-base-sentiment-latest"
@@ -43,12 +43,14 @@ def create_csv_data_sentiment_model():
     # dataset_for_model.to_csv("sentiment_dataset.csv")
     return len(dataset_base)
 
+
 def get_yesno_task_results(yesno_task, text):
     result = yesno_task(text, return_all_scores=True)
     # return [[result[0][0]['score'], result[0][1]['score'], result[0][2]['score']], ""]
     words_arr = [(result[0][0]['label'], result[0][0]['score']), (result[0][1]['label'], result[0][1]['score'])]
     tensor = create_word_prob_encoding(words_arr)
     return tensor
+
 
 def create_csv_data_yesno_model(starting_idx):
     MODEL = "nc33/yes_no_qna_deberta_model"
@@ -74,6 +76,7 @@ def create_csv_data_yesno_model(starting_idx):
 
     # dataset_for_model.to_csv("yesno_dataset.csv")
 
+
 def merge_datasets(dataset1_filename, dataset2_filename):
     dataset1 = load_dataset("csv", data_files=dataset1_filename)
     dataset2 = load_dataset("csv", data_files=dataset2_filename)
@@ -92,14 +95,17 @@ def merge_datasets(dataset1_filename, dataset2_filename):
 
     # final_dataset.to_csv("final_dataset.csv")
 
+
 def find_index_of_word_in_vocabulary(word):
     tokenizer = T5Tokenizer.from_pretrained("t5-small")
     # model = T5ForConditionalGeneration.from_pretrained("t5-small")
-    tokenized_word = tokenizer.tokenize(word)
-    word_index = 0
-    if tokenized_word[0] in tokenizer.get_vocab():
-        word_index = tokenizer.get_vocab()[tokenized_word[0]]
-    return word_index
+    token_ids = tokenizer.encode(word, add_special_tokens=False)
+    return token_ids
+    # tokenized_word = tokenizer.tokenize(word)
+    # word_index = 0
+    # if tokenized_word[0] in tokenizer.get_vocab():
+    #     word_index = tokenizer.get_vocab()[tokenized_word[0]]
+    # return word_index
 
 # def create_word_prob_encoding(words_arr):
 #     words_tensor = [0 for i in range(32128)]
@@ -109,6 +115,7 @@ def find_index_of_word_in_vocabulary(word):
 #         print(word, ": ", word_index)
 #     return words_tensor
 
+
 def create_word_prob_encoding(words_arr):
     words_tensor_arr = [("", 0) for i in range(len(words_arr))]
     for i in range(len(words_arr)):
@@ -117,6 +124,7 @@ def create_word_prob_encoding(words_arr):
         words_tensor_arr[i] = (word_index, prob)
         # print(word, ": ", word_index)
     return words_tensor_arr
+
 
 curr_idx = create_csv_data_sentiment_model()
 create_csv_data_yesno_model(curr_idx)

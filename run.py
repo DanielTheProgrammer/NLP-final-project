@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from transformers import T5ForConditionalGeneration
 from datasets import load_dataset
 import knowledge_distilation
+import teacher_dataset
 
 
 def run():
@@ -49,10 +50,11 @@ def run():
     trainer.fit(model)
 
 def create_dataloader():
-    dataset = load_dataset("csv", data_files="final_dataset.csv")
-    dataset = dataset["train"]
-    dataloader = DataLoader(dataset, other_arguments.train_batch_size, drop_last=False,
-                            shuffle=True, num_workers=training_arguments.num_workers)
+    dataloader = teacher_dataset.create_dataloader("final_dataset.csv", other_arguments.train_batch_size)
+    # dataset = load_dataset("csv", data_files="final_dataset.csv")
+    # dataset = dataset["train"]
+    # dataloader = DataLoader(dataset, other_arguments.train_batch_size, drop_last=False,
+    #                         shuffle=True, num_workers=training_arguments.num_workers)
     return dataloader
 
 
