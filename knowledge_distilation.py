@@ -46,7 +46,7 @@ class ClassificationModelKD(pl.LightningModule):
         self.dataloader = dataloader
 
         file = open("model_run_parameters.txt", "w")
-        file.writelines("epoch,step,loss,accuracy,student_probability_for_true_label,true_probability_of_label\n")
+        file.writelines("epoch,step,input,loss,accuracy,student_probability_for_true_label,true_probability_of_label\n")
 
         file = open("student_model_generated.txt", "w")
         file.writelines("epoch,input,output_1,output_2,output_3\n")
@@ -91,7 +91,7 @@ class ClassificationModelKD(pl.LightningModule):
         file = open("model_run_parameters.txt", "a")
         for i in range(len(x)):
             line = str(self.trainer.current_epoch) + "," + str(self.trainer.global_step) + "," + \
-                   str('%.8f' % loss.item()) + "," + str('%.8f' % acc) + "," + \
+                   x[i] + "," + str('%.8f' % loss.item()) + "," + str('%.8f' % acc) + "," + \
                    str('%.8f' % student_probability_of_label[i].item()) + "," + \
                    str('%.8f' % true_probability_of_label[i].item()) + '\n'
             file.write(line)
@@ -241,7 +241,6 @@ class ClassificationModelKD(pl.LightningModule):
                 for output in decoded_outputs:
                     file.write(f',{output}')
                 file.write('\n')
-            break
         file.close()
 
         super(ClassificationModelKD, self).on_train_epoch_end()
