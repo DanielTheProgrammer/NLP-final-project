@@ -88,7 +88,7 @@ class ClassificationModelKD(pl.LightningModule):
         # parameters = [self.trainer.global_step, self.trainer.current_epoch, loss, acc, student_probability_of_label,
         #               true_probability_of_label]
 
-        file = open("model_run_parameters.txt", "a")
+        file = open("model_run_parameters.txt", "a", encoding="utf-8")
         for i in range(len(x)):
             line = str(self.trainer.current_epoch) + "," + str(self.trainer.global_step) + "," + \
                    x[i] + "," + str('%.8f' % loss.item()) + "," + str('%.8f' % acc) + "," + \
