@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def create_pandas_from_results(filepath):
-    pandas_table = pd.read_csv(filepath, sep=",")
+    pandas_table = pd.read_csv(filepath, sep="||")
     return pandas_table
 
 def evaluate_5epochs_2batches_results():

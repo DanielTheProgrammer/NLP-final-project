@@ -1,0 +1,37 @@
+C:\Users\rauser\AppData\Local\Programs\Python\Python39\python.exe D:\NLP-final-project\run.py 
+Training arguments Namespace(opt_level='O1', max_grad_norm=1.0, fp_16=False, n_gpu=-1, num_workers=8, distributed_backend=None)
+--------------------
+Model arguments Namespace(num_labels=None, fc1_size=None)
+--------------------
+Other arguments Namespace(output_dir='./', teacher_model='./', alpha_for_kd=0.9, temperature_for_kd=20, predictions_file='predictions.csv', data_dir='./', train_batch_size=2, eval_batch_size=2, max_train_samples=-1, num_train_epochs=5, gradient_accumulation_steps=1, seed=42, save_top_k=-1, save_last=False, write_dev_predictions=False, learning_rate=0.0003, do_fast_dev_run=False, limit_train_batches=-1, limit_val_batches=-1)
+--------------------
+Seed set to 42
+You are using the default legacy behaviour of the <class 'transformers.models.t5.tokenization_t5.T5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thouroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\pytorch_lightning\trainer\connectors\logger_connector\logger_connector.py:67: Starting from v1.9.0, `tensorboardX` has been removed as a dependency of the `pytorch_lightning` package, due to potential conflicts with other packages in the ML ecosystem. For this reason, `logger=True` will use `CSVLogger` as the default logger, unless the `tensorboard` or `tensorboardX` packages are found. Please `pip install lightning[extra]` or one of them to enable TensorBoard support by default
+C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\pytorch_lightning\trainer\configuration_validator.py:74: You defined a `validation_step` but have no `val_dataloader`. Skipping val loop.
+
+  | Name  | Type                       | Params
+-----------------------------------------------------
+0 | model | T5ForConditionalGeneration | 60.5 M
+-----------------------------------------------------
+60.5 M    Trainable params
+0         Non-trainable params
+60.5 M    Total params
+242.026   Total estimated model params size (MB)
+C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\pytorch_lightning\trainer\connectors\data_connector.py:436: Consider setting `persistent_workers=True` in 'train_dataloader' to speed up the dataloader worker initialization.
+Epoch 0:   0%|          | 0/5633 [00:00<?, ?it/s] C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\transformers\models\t5\tokenization_t5.py:303: UserWarning: This sequence already has </s>. In future versions this behavior may lead to duplicated eos tokens being added.
+  warnings.warn(
+C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\nn\functional.py:2943: UserWarning: reduction: 'mean' divides the total loss by both the batch size and the support size.'batchmean' divides only by the batch size, and aligns with the KL div math definition.'mean' will be changed to behave the same as 'batchmean' in the next major release.
+  warnings.warn(
+C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\pytorch_lightning\trainer\connectors\logger_connector\result.py:212: You called `self.log('train_acc', ...)` in your `training_step` but the value needs to be floating to be reduced. Converting it to torch.float32. You can silence this warning by converting the value to floating point yourself. If you don't intend to reduce the value (for instance when logging the global step or epoch) then you can use `self.logger.log_metrics({'train_acc': ...})` instead.
+Epoch 0: 100%|██████████| 5633/5633 [1:39:01<00:00,  0.95it/s, v_num=215, train_loss_inbal_step=4.2e-7, train_acc_step=0.000, train_loss_inbal_epoch=3.26e-7, train_acc_epoch=0.000]C:\Users\rauser\AppData\Local\Programs\Python\Python39\lib\site-packages\transformers\generation\utils.py:1273: UserWarning: Using the model-agnostic default `max_length` (=20) to control the generation length. We recommend setting `max_new_tokens` to control the maximum length of the generation.
+  warnings.warn(
+Epoch 4: 100%|██████████| 5633/5633 [2:12:37<00:00,  0.71it/s, v_num=215, train_loss_inbal_step=3.12e-7, train_acc_step=0.000, train_loss_inbal_epoch=3.3e-7, train_acc_epoch=0.000]
+`Trainer.fit` stopped: `max_epochs=5` reached.
+
+Process finished with exit code 0
