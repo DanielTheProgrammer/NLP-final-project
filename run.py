@@ -1,8 +1,6 @@
 import pytorch_lightning as pl
 import argparse
-from torch.utils.data import DataLoader
 from transformers import T5ForConditionalGeneration
-from datasets import load_dataset
 import knowledge_distilation
 import teacher_dataset
 
@@ -12,29 +10,14 @@ def run():
     dataloader = create_dataloader()
     student_model = T5ForConditionalGeneration.from_pretrained("t5-small")
     model = knowledge_distilation.ClassificationModelKD(training_arguments=training_arguments,
-                                  model_arguments=model_arguments,
-                                  other_arguments=other_arguments,
-                                  student_model=student_model,
-                                  dataloader=dataloader)
-
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        dirpath=other_arguments.output_dir,
-        monitor="val_acc",
-        save_top_k=other_arguments.save_top_k,
-        save_last=other_arguments.save_last,
-        mode='max'
-    )
+                                                        model_arguments=model_arguments,
+                                                        other_arguments=other_arguments,
+                                                        student_model=student_model,
+                                                        dataloader=dataloader)
 
     train_params = dict(
-        # accumulate_grad_batches=other_arguments.gradient_accumulation_steps,
-        # gpus=training_arguments.n_gpu,
-        # deterministic=True,
         max_epochs=other_arguments.num_train_epochs,
         precision=16 if training_arguments.fp_16 else 32,
-        # amp_level=training_arguments.opt_level,
-        # gradient_clip_val=training_arguments.max_grad_norm,
-        # callbacks=[checkpoint_callback],
-        # fast_dev_run=other_arguments.do_fast_dev_run,
     )
 
     if other_arguments.limit_train_batches != -1:
@@ -49,12 +32,9 @@ def run():
     trainer = pl.Trainer(**train_params)
     trainer.fit(model)
 
+
 def create_dataloader():
     dataloader = teacher_dataset.create_dataloader("final_dataset.csv", other_arguments.train_batch_size)
-    # dataset = load_dataset("csv", data_files="final_dataset.csv")
-    # dataset = dataset["train"]
-    # dataloader = DataLoader(dataset, other_arguments.train_batch_size, drop_last=False,
-    #                         shuffle=True, num_workers=training_arguments.num_workers)
     return dataloader
 
 
