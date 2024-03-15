@@ -81,7 +81,9 @@ def fix_data_separator(*file_paths):
 
 
 def batch_size_experiment():
-    model_parameters_batch_2 = create_pandas_from_results("results/10Epochs_2Batches/modified_model_run_parameters.txt")
+    # model_parameters_batch_2 = create_pandas_from_results("results/10Epochs_2Batches/modified_model_run_parameters.txt")
+    model_parameters_batch_2 = create_pandas_from_results("results/15Epochs_2Batches/modified_model_run_parameters.txt")
+
     model_parameters_batch_5 = create_pandas_from_results("results/10Epochs_5Batches/modified_model_run_parameters.txt")
 
     evaluate_model_parameter_results(model_parameters_batch_2, model_parameters_batch_5,
@@ -96,9 +98,10 @@ def epoch_number_experiment():
 
 
 def compare_tasks_experiment():
-    model_parameters_epoch_10 = create_pandas_from_results("results/10Epochs_2Batches/modified_model_run_parameters.txt")
-    df_sentiment = model_parameters_epoch_10[model_parameters_epoch_10['input'].str.startswith("what sentiment the following sentence has:")]
-    df_yes_no = model_parameters_epoch_10[model_parameters_epoch_10['input'].str.startswith("Answer yes or no:")]
+    # model_parameters_epoch_10 = create_pandas_from_results("results/10Epochs_2Batches/modified_model_run_parameters.txt")
+    model_parameters_epoch_15 = create_pandas_from_results("results/15Epochs_2Batches/modified_model_run_parameters.txt")
+    df_sentiment = model_parameters_epoch_15[model_parameters_epoch_15['input'].str.startswith("what sentiment the following sentence has:")]
+    df_yes_no = model_parameters_epoch_15[model_parameters_epoch_15['input'].str.startswith("Answer yes or no:")]
 
     evaluate_model_parameter_results(df_sentiment, df_yes_no, " in Sentiment Analysis", " in Question Answering")
 
@@ -107,7 +110,10 @@ if __name__ == "__main__":
     # fix_data_separator("results/5Epochs_2Batches/model_run_parameters.txt",
     #                    "results/5Epochs_5Batches/model_run_parameters.txt",
     #                    "results/10Epochs_2Batches/model_run_parameters.txt",
-    #                    "results/10Epochs_5Batches/model_run_parameters.txt")
+    #                    "results/10Epochs_5Batches/model_run_parameters.txt",
+    #                    "results/15Epochs_2Batches/model_run_parameters.txt",
+    #                    "results/15Epochs_5Batches/model_run_parameters.txt")
+
     # epoch_number_experiment()
     batch_size_experiment()
     compare_tasks_experiment()
