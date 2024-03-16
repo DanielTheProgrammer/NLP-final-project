@@ -84,7 +84,7 @@ def batch_size_experiment():
     # model_parameters_batch_2 = create_pandas_from_results("results/10Epochs_2Batches/modified_model_run_parameters.txt")
     model_parameters_batch_2 = create_pandas_from_results("results/15Epochs_2Batches/modified_model_run_parameters.txt")
 
-    model_parameters_batch_5 = create_pandas_from_results("results/10Epochs_5Batches/modified_model_run_parameters.txt")
+    model_parameters_batch_5 = create_pandas_from_results("results/15Epochs_5Batches/modified_model_run_parameters.txt")
 
     evaluate_model_parameter_results(model_parameters_batch_2, model_parameters_batch_5,
                                      " with Batch Size 2", " with Batch Size 5")

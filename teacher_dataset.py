@@ -1,7 +1,6 @@
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 import torch
-import ast
 
 
 class TeacherDataset(Dataset):
@@ -12,12 +11,6 @@ class TeacherDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # input_data = self.data.iloc[idx, :-1].values.tolist()
-        # # label = self.data.iloc[idx, -1]
-        # label_str = self.data.iloc[idx, -1]
-        # label = ast.literal_eval(label_str)  # Parse string to list
-        # return input_data, label
-
         # Get input and label data at the specified index
         input_text = self.data.iloc[idx, 0]  # Assuming input is in the first column
         label_str = self.data.iloc[idx, 1]  # Assuming label is in the second column
